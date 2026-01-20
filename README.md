@@ -69,7 +69,7 @@ Recognizing that "paper trades" are deceptive, this project incorporates:
     Bash
 
     **Clone the repository**
-    git clone https://github.com/yourusername/stat-arb-kalman.git
+    git clone https://github.com/jmiaie/stat-arb-kalman.git
 
     **Install dependencies**
     pip install -r requirements.txt
