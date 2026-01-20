@@ -80,3 +80,7 @@ Recognizing that "paper trades" are deceptive, this project incorporates:
 
     **Run the research notebook**
     jupyter notebook research/main_backtest.ipynb
+
+
+__________________________________________________________________________________________________________
+All rights reserved © Jeff Milam | https://github.com/jmiaie
