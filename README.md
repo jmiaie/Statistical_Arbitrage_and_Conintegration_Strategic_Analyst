@@ -2,6 +2,10 @@
 PUBLIC: Statistical Arbitrage and Conintegration Strategic Analyst (Python)
 ## Project Title: Dynamic Statistical Arbitrage & Risk-Aware Backtesting
 
+## 👤 Author: Jeff Milam, EMBA | jmilam.emba@gmail.com | https://www.github.com/jmiaie
+
+
+
 ### 1. Executive Summary
 
 This repository implements an institutional-grade statistical arbitrage strategy. Unlike traditional static pairs trading, this project utilizes a Kalman Filter for dynamic state estimation of hedge ratios and a Fama-French Factor Model to isolate idiosyncratic alpha. The strategy is rigorously tested against a non-linear Transaction Cost Model to determine capacity and execution sensitivity.
