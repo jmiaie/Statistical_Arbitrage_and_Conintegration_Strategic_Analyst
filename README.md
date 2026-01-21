@@ -83,4 +83,9 @@ Recognizing that "paper trades" are deceptive, this project incorporates:
 
 
 __________________________________________________________________________________________________________
-All rights reserved © Jeff Milam | https://github.com/jmiaie
+
+# Copyright (c) 2026 Jeff Milam, EMBA. All Rights Reserved.
+# GitHub: https://github.com/jmiaie
+#
+# This code is proprietary and private. Unauthorized copying of this file,
+# via any medium, is strictly prohibited.
