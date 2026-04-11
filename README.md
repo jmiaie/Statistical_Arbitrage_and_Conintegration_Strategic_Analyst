@@ -2,7 +2,7 @@
 PUBLIC: Statistical Arbitrage and Conintegration Strategic Analyst (Python)
 ## Project Title: Dynamic Statistical Arbitrage & Risk-Aware Backtesting
 
-## 👤 Author: Jeff Milam, EMBA | jmilam.emba@gmail.com | https://www.github.com/jmiaie
+## 👤 Author: Jeff Milam, MBA | jmilam.emba@gmail.com | https://www.github.com/jmiaie
 
 
 
@@ -84,7 +84,7 @@ Recognizing that "paper trades" are deceptive, this project incorporates:
 
 __________________________________________________________________________________________________________
 
-## Copyright (c) 2026 Jeff Milam, EMBA. All Rights Reserved.
+## Copyright (c) 2026 Jeff Milam, MBA. All Rights Reserved.
 ## GitHub: https://github.com/jmiaie
 ##
 ## This code is proprietary and private. Unauthorized copying of this file,
