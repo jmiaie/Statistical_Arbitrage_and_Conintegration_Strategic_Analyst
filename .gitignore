@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# Data & artefacts
+data/raw/
+data/interim/
+*.csv
+*.parquet
+*.h5
+*.pkl
+!examples/**/*.csv
+output/
+reports/*.pdf
+!docs/**/*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Env / secrets
+.env
+.env.local
+secrets/

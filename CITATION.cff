@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+title: "quant-pairs-lab: Dynamic Statistical Arbitrage & Risk-Aware Backtesting"
+message: "If you reference or build upon this work, please cite it as below."
+type: software
+authors:
+  - family-names: Milam
+    given-names: Jeff
+    email: jmilam.emba@gmail.com
+    affiliation: Independent Quantitative Researcher
+repository-code: "https://github.com/jmiaie/quant-pairs-lab"
+url: "https://github.com/jmiaie/quant-pairs-lab"
+keywords:
+  - statistical-arbitrage
+  - pairs-trading
+  - cointegration
+  - kalman-filter
+  - fama-french
+  - quantitative-finance
+  - backtesting
+  - transaction-cost-analysis
+license: LicenseRef-Proprietary
+version: "0.1.0"
+date-released: 2026-05-09
