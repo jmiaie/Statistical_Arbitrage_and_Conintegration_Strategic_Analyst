@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantpairs"
+version = "0.1.0"
+description = "Dynamic statistical arbitrage with Kalman-filtered hedge ratios."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Jeff Milam", email = "jmilam.emba@gmail.com" }]
+keywords = ["statistical-arbitrage", "pairs-trading", "cointegration", "kalman-filter"]
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "scipy>=1.11",
+    "statsmodels>=0.14",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+data = ["yfinance>=0.2.40", "pandas-datareader>=0.10"]
+viz = ["seaborn>=0.13"]
+agent = ["anthropic>=0.39"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pandas-stubs",
+    "types-requests",
+]
+all = ["quantpairs[data,viz,agent,dev]"]
+
+[project.scripts]
+quantpairs-screen = "quantpairs.llm_screener:cli"
+quantpairs-research = "quantpairs.agent:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+quantpairs = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+ignore_missing_imports = true
+files = ["src/quantpairs"]
+
+[[tool.mypy.overrides]]
+module = [
+    "numpy",
+    "numpy.*",
+    "pandas",
+    "pandas.*",
+    "yfinance",
+    "yfinance.*",
+    "pandas_datareader",
+    "pandas_datareader.*",
+    "statsmodels",
+    "statsmodels.*",
+    "scipy",
+    "scipy.*",
+    "matplotlib",
+    "matplotlib.*",
+    "anthropic",
+    "anthropic.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

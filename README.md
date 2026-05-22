@@ -12,12 +12,16 @@
 [![statsmodels](https://img.shields.io/badge/statsmodels-3B5C8C)](https://www.statsmodels.org/)
 [![SciPy](https://img.shields.io/badge/SciPy-8CAAE6?logo=scipy&logoColor=white)](https://scipy.org/)
 [![Jupyter](https://img.shields.io/badge/Jupyter-F37626?logo=jupyter&logoColor=white)](https://jupyter.org/)
+[![CI](https://github.com/jmiaie/quant-pairs-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/jmiaie/quant-pairs-lab/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-mkdocs--material-526CFE?logo=materialformkdocs&logoColor=white)](https://jmiaie.github.io/quant-pairs-lab/)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](./LICENSE)
 [![Status](https://img.shields.io/badge/status-research-blue)](#)
 
 **Author:** Jeff Milam, MBA &nbsp;·&nbsp; [GitHub](https://github.com/jmiaie) &nbsp;·&nbsp; [Email](mailto:jmilam.emba@gmail.com)
 
 [English](./README.md) &nbsp;·&nbsp; [Español](./docs/i18n/README.es.md) &nbsp;·&nbsp; [中文](./docs/i18n/README.zh.md) &nbsp;·&nbsp; [日本語](./docs/i18n/README.ja.md) &nbsp;·&nbsp; [Français](./docs/i18n/README.fr.md)
+
+<img src="./docs/assets/hero.png" alt="quant-pairs-lab equity curve and Kalman-filtered hedge ratio" width="100%"/>
 
 </div>
 
@@ -30,12 +34,14 @@
 3. [Quantitative Methodology](#3-quantitative-methodology)
 4. [Execution & Transaction Cost Analysis](#4-execution--transaction-cost-analysis)
 5. [Key Performance Indicators](#5-key-performance-indicators)
-6. [Tech Stack](#6-tech-stack)
-7. [Quickstart](#7-quickstart)
-8. [Repository Layout](#8-repository-layout)
-9. [Roadmap](#9-roadmap)
-10. [Citation](#10-citation)
-11. [License](#11-license)
+6. [AI / LLM Integration](#6-ai--llm-integration)
+7. [Tech Stack](#7-tech-stack)
+8. [Quickstart](#8-quickstart)
+9. [Repository Layout](#9-repository-layout)
+10. [Limitations & Honest Findings](#10-limitations--honest-findings)
+11. [Roadmap](#11-roadmap)
+12. [Citation](#12-citation)
+13. [License](#13-license)
 
 ---
 
@@ -125,7 +131,27 @@ The intercept $\alpha$ is the headline number; the betas are diagnostic guardrai
 
 ---
 
-## 6. Tech Stack
+## 6. AI / LLM Integration
+
+This isn't just a quant repo — it doubles as an AI-engineering portfolio piece.
+
+**LLM-powered pair screener** (`quantpairs.llm_screener`). Given a theme, Claude proposes economically plausible pair candidates, then statistics decide which survive:
+
+```bash
+quantpairs-screen "energy transition supply chain"
+```
+
+**Research agent** (`quantpairs.agent`). Runs the full pipeline on a pair and asks Claude to author a one-page research memo with explicit limitations:
+
+```bash
+quantpairs-research KO PEP --start 2018-01-01 --output results/memo.md
+```
+
+Both use the Anthropic Python SDK with **prompt caching** on the system block so iterating on themes is cheap.
+
+---
+
+## 7. Tech Stack
 
 - **Language:** Python 3.10+
 - **Quantitative:** NumPy, pandas, SciPy, statsmodels
@@ -136,56 +162,79 @@ The intercept $\alpha$ is the headline number; the betas are diagnostic guardrai
 
 ---
 
-## 7. Quickstart
+## 8. Quickstart
 
 ```bash
-# 1. Clone
+# 1. Clone & install (editable, with dev extras)
 git clone https://github.com/jmiaie/quant-pairs-lab.git
 cd quant-pairs-lab
-
-# 2. Environment
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[data,viz,dev]"
 
-# 3. Run the research notebook
-jupyter notebook research/main_backtest.ipynb
+# 2. Run the test suite (17 tests, ~3 s)
+pytest
 
-# 4. Generate the institutional PDF tear-sheet
-python generate_pdf.py
+# 3. Reproduce the headline result end-to-end
+python research/main_backtest.py --pair KO PEP --start 2018-01-01 --end 2024-12-31
+# Artefacts land in results/
+
+# 4. (Optional) LLM-powered features — needs ANTHROPIC_API_KEY
+pip install -e ".[agent]"
+quantpairs-screen "semiconductor capex cycle"
+quantpairs-research KO PEP
+
+# 5. Regenerate the README hero image
+python scripts/generate_hero.py
 ```
 
 ---
 
-## 8. Repository Layout
+## 9. Repository Layout
 
 ```
 quant-pairs-lab/
-├── README.md                  # You are here
-├── LICENSE                    # Proprietary, all rights reserved
-├── CITATION.cff               # How to cite this work
-├── CONTRIBUTING.md            # Collaboration guidelines
-├── requirements.txt
-├── generate_pdf.py            # Tear-sheet generator
-├── docs/
-│   ├── i18n/                  # Translated READMEs (es, zh, ja, fr)
-│   └── methodology.md         # Extended quantitative notes
-├── examples/                  # Minimal runnable examples
-└── .github/                   # Issue & PR templates
+├── src/quantpairs/            # Library code (Kalman, cointegration, TCA, WFO, attribution)
+│   ├── llm_screener.py        # Claude-powered candidate screener
+│   └── agent.py               # Research-memo agent
+├── tests/                     # pytest suite — synthetic data, known answers
+├── research/                  # main_backtest.{py,ipynb} — end-to-end pipeline
+├── results/                   # Committed artefacts (KPIs, equity curves, attribution)
+├── examples/                  # Minimal runnable smoke tests
+├── scripts/                   # generate_hero.py and friends
+├── docs/                      # mkdocs-material site source + i18n/methodology
+├── .github/workflows/         # CI (ruff + mypy + pytest) + Pages deploy
+├── README.md · RESULTS.md · LICENSE · CITATION.cff · CONTRIBUTING.md
+└── pyproject.toml
 ```
 
 ---
 
-## 9. Roadmap
+## 10. Limitations & Honest Findings
 
-- [ ] Vectorised multi-pair backtester with walk-forward optimisation
-- [ ] Bayesian online learning for noise covariances $Q, R$
-- [ ] Regime-switching (HMM) overlay for entry suppression
-- [ ] Intraday extension with limit-order book microstructure costs
-- [ ] LLM-assisted research agent (cointegration candidate screener)
+A portfolio repo that only celebrates wins is a red flag. The known weaknesses, called out upfront:
+
+- **In-sample / OOS gap.** Headline in-sample Sharpe ~1.4 collapses to ~0.7 OOS once walk-forward is enforced — a 2× degradation that any serious reviewer will look for.
+- **Cost sensitivity.** Sharpe halves again when costs go from 2 bps to 5 bps. Borrow rebates on the short leg are modelled only at a flat rate.
+- **Capacity ceiling.** The square-root impact model implies meaningful Sharpe degradation above ~$5M per leg on a typical pair — fine for proof-of-concept, not institutional scale without diversification across many pairs.
+- **Regime fragility.** KO/PEP cointegration weakens post-2022; the Kalman filter adapts but trade frequency drops, and the OOS t-stat on α is marginal (~1.9, Newey–West).
+- **Single-pair demo.** The artefacts in `results/` showcase one pair; a production deployment would screen 200+ pairs monthly and run a portfolio overlay.
+
+See [`RESULTS.md`](./RESULTS.md) for the full KPI table and `docs/methodology.md` for assumptions.
 
 ---
 
-## 10. Citation
+## 11. Roadmap
+
+- [x] Walk-forward backtester with expanding-anchor folds
+- [x] LLM-assisted research agent + cointegration candidate screener
+- [ ] Vectorised multi-pair portfolio overlay
+- [ ] Bayesian online learning for noise covariances $Q, R$
+- [ ] Regime-switching (HMM) overlay for entry suppression
+- [ ] Intraday extension with limit-order book microstructure costs
+
+---
+
+## 12. Citation
 
 If you reference this work, please cite via the `CITATION.cff` metadata or:
 
@@ -193,7 +242,7 @@ If you reference this work, please cite via the `CITATION.cff` metadata or:
 
 ---
 
-## 11. License
+## 13. License
 
 Copyright © 2026 Jeff Milam, MBA. All rights reserved. This code is proprietary; unauthorised copying, distribution, or derivative use via any medium is strictly prohibited. See [`LICENSE`](./LICENSE) for full terms.
 

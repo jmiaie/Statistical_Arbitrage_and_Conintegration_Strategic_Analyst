@@ -1,0 +1,25 @@
+{
+  "note": "Synthetic-data demo. Use research/main_backtest.py with real tickers.",
+  "cointegration": {
+    "eg_pvalue": 0.012847513755314064,
+    "adf_pvalue": 0.0027485703346997424,
+    "hedge_ratio": 1.7981195085657,
+    "half_life_days": 37.543432505043135
+  },
+  "in_sample_kpis": {
+    "sharpe_net": 3.361144170755439,
+    "sharpe_gross": 3.6162047514097124,
+    "annual_return": 0.03419044864498342,
+    "annual_vol": 0.010172264832454031,
+    "max_drawdown": -0.0019077189900900127,
+    "hit_rate": 0.5769230769230769,
+    "avg_turnover": 0.08777777777777777,
+    "n_trades": 158.0
+  },
+  "oos_kpis": {
+    "oos_sharpe": 3.358317165972073,
+    "oos_annual_return": 0.03331411819788453,
+    "oos_max_drawdown": -0.0018995633348913854,
+    "oos_n_obs": 1260.0
+  }
+}
