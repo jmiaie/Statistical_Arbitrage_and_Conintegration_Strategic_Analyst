@@ -119,6 +119,17 @@ The intercept $\alpha$ is the headline number; the betas are diagnostic guardrai
 
 ---
 
+## 4b. Empirical lift (synthetic-pair demo)
+
+| Metric | Kalman | Static OLS | **Lift** |
+|---|---:|---:|---:|
+| Net Sharpe | 3.36 | 1.25 | **+2.11** |
+| OOS Sharpe 95% CI (stationary bootstrap) | [2.93, 3.76] | — | — |
+
+On this synthetic pair (designed with a slowly drifting true β), the Kalman filter delivers a +2.11 Sharpe lift over a static-OLS hedge ratio with the same signal logic — the empirical justification for the entire methodology. Real-data lift is smaller but directionally consistent whenever the true hedge ratio is non-stationary. See [`RESULTS.md`](./RESULTS.md).
+
+---
+
 ## 5. Key Performance Indicators
 
 | Metric | Definition | Why it matters |
@@ -227,10 +238,15 @@ See [`RESULTS.md`](./RESULTS.md) for the full KPI table and `docs/methodology.md
 
 - [x] Walk-forward backtester with expanding-anchor folds
 - [x] LLM-assisted research agent + cointegration candidate screener
-- [ ] Vectorised multi-pair portfolio overlay
-- [ ] Bayesian online learning for noise covariances $Q, R$
-- [ ] Regime-switching (HMM) overlay for entry suppression
+- [x] Multi-pair portfolio overlay with inverse-vol weighting + vol targeting
+- [x] Bootstrap confidence intervals (stationary block) for Sharpe
+- [x] Static-OLS benchmark with side-by-side KPI comparison
+- [x] MLE-tuned Kalman noise covariances ($Q, R$) per pair
+- [x] Two-state regime overlay (calm vs. stressed) to suppress entries
+- [x] Lightweight experiment-manifest tracking (`results/runs/`)
+- [x] HTML tear-sheet generator (self-contained, base64-embedded charts)
 - [ ] Intraday extension with limit-order book microstructure costs
+- [ ] Streamlit demo app
 
 ---
 

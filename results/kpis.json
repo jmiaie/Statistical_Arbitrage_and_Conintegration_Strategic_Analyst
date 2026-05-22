@@ -21,5 +21,11 @@
     "oos_annual_return": 0.03331411819788453,
     "oos_max_drawdown": -0.0018995633348913854,
     "oos_n_obs": 1260.0
-  }
+  },
+  "oos_sharpe_ci_95": {
+    "point": 3.358317165972073,
+    "lower": 2.9282302065699692,
+    "upper": 3.755778388227359
+  },
+  "kalman_vs_ols_lift_sharpe": 2.1133352828993948
 }

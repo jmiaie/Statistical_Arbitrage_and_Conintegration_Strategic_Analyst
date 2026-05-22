@@ -15,7 +15,11 @@ import numpy as np
 import pandas as pd
 
 from quantpairs.backtest import run_backtest
+from quantpairs.benchmarks import compare_to_kalman, static_ols_backtest
 from quantpairs.cointegration import engle_granger_test
+from quantpairs.stats import sharpe_ci
+from quantpairs.tearsheet import write_tearsheet
+from quantpairs.tracking import log_run
 from quantpairs.wfo import walk_forward
 
 RESULTS = Path("results")
@@ -56,6 +60,16 @@ def main() -> None:
     plt.close(fig)
 
     wfo.fold_kpis.to_csv(RESULTS / "wfo_folds.csv", index=False)
+
+    # Sprint 2: bootstrap CI and OLS benchmark
+    ci = sharpe_ci(wfo.oos_returns, n_boot=1000, seed=42)
+    ols = static_ols_backtest(log_y, log_x, cost_bps=2.0)
+    comparison = compare_to_kalman(bt, ols)
+    comparison.to_csv(RESULTS / "kalman_vs_ols.csv", index=False)
+
+    # Sprint 2: tear-sheet
+    write_tearsheet(bt, RESULTS / "tearsheet.html", title="Synthetic Pair — Kalman Backtest")
+
     payload = {
         "note": "Synthetic-data demo. Use research/main_backtest.py with real tickers.",
         "cointegration": {
@@ -66,8 +80,21 @@ def main() -> None:
         },
         "in_sample_kpis": bt.kpis,
         "oos_kpis": wfo.oos_kpis,
+        "oos_sharpe_ci_95": {"point": ci.point, "lower": ci.lower, "upper": ci.upper},
+        "kalman_vs_ols_lift_sharpe": float(
+            comparison.loc[comparison["Metric"] == "sharpe_net", "Lift"].iloc[0]
+        ),
     }
     (RESULTS / "kpis.json").write_text(json.dumps(payload, indent=2))
+
+    # Sprint 3: experiment manifest
+    log_run(
+        tag="synthetic-demo",
+        params={"cost_bps": 2.0, "train_size": 504, "test_size": 126},
+        kpis={**bt.kpis, **wfo.oos_kpis},
+        notes="Synthetic mean-reverting pair, deterministic seed.",
+    )
+
     print("Synthetic results written to", RESULTS)
     print(json.dumps(payload, indent=2))
 

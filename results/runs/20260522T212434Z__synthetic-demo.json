@@ -1,0 +1,29 @@
+{
+  "tag": "synthetic-demo",
+  "params": {
+    "cost_bps": 2.0,
+    "train_size": 504,
+    "test_size": 126
+  },
+  "kpis": {
+    "sharpe_net": 3.361144170755439,
+    "sharpe_gross": 3.6162047514097124,
+    "annual_return": 0.03419044864498342,
+    "annual_vol": 0.010172264832454031,
+    "max_drawdown": -0.0019077189900900127,
+    "hit_rate": 0.5769230769230769,
+    "avg_turnover": 0.08777777777777777,
+    "n_trades": 158.0,
+    "oos_sharpe": 3.358317165972073,
+    "oos_annual_return": 0.03331411819788453,
+    "oos_max_drawdown": -0.0018995633348913854,
+    "oos_n_obs": 1260.0
+  },
+  "window": null,
+  "notes": "Synthetic mean-reverting pair, deterministic seed.",
+  "code_version": "0.3.0",
+  "git_commit": "50de305",
+  "host": "vm",
+  "python": "3.11.15",
+  "timestamp": "2026-05-22T21:24:34.545870+00:00"
+}

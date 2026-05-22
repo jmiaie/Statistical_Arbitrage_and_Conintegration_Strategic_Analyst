@@ -24,6 +24,38 @@
 
 ::: quantpairs.wfo
 
+## Position sizing
+
+::: quantpairs.sizing
+
+## Portfolio overlay
+
+::: quantpairs.portfolio
+
+## Bootstrap statistics
+
+::: quantpairs.stats
+
+## Naïve benchmarks
+
+::: quantpairs.benchmarks
+
+## Tear-sheet
+
+::: quantpairs.tearsheet
+
+## Adaptive Kalman (MLE)
+
+::: quantpairs.adaptive
+
+## Regime overlay
+
+::: quantpairs.regime
+
+## Experiment tracking
+
+::: quantpairs.tracking
+
 ## Fama–French attribution
 
 ::: quantpairs.attribution

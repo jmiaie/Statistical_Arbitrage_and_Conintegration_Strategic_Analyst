@@ -19,6 +19,7 @@ data/interim/
 *.h5
 *.pkl
 !examples/**/*.csv
+!results/**/*.csv
 output/
 reports/*.pdf
 !docs/**/*.pdf
