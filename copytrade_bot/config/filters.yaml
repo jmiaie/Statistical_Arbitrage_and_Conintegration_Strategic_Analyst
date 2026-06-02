@@ -1,0 +1,31 @@
+enabled: true
+mode: paper            # paper | live  (live = real money on Polymarket)
+dry_run: false        # if true, evaluate + size but never place
+
+filters:
+  min_win_rate: 0.55          # fraction 0-1   (e.g. 0.55 = 55%)
+  min_ev: 0.0                 # percent        (require a non-negative edge)
+  min_roi: null               # percent        (null disables the bound)
+  min_expected_return: null   # percent
+  min_entry_price: null
+  max_entry_price: null
+  min_size: null
+  max_size: null
+  require_fields:             # alert is skipped unless these parsed
+    - win_rate
+  blocked_keywords: []
+  allowed_sources: []         # empty = accept all sources
+  blocked_sources: []
+
+sizing:
+  mode: fraction              # fixed | fraction | kelly
+  fixed_amount: 50.0
+  bankroll: 1000.0
+  fraction: 0.02              # 2% of bankroll per trade (mode=fraction)
+  kelly_fraction: 0.5         # half-Kelly (mode=kelly)
+  max_position: 200.0
+  min_position: 1.0
+
+risk:
+  max_open_positions: 25
+  max_daily_loss: 250.0

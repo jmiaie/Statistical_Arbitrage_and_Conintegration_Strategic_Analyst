@@ -1,0 +1,6 @@
+requests>=2.31
+PyYAML>=6.0
+python-dotenv>=1.0
+
+# Optional — only needed for LIVE Polymarket trading (StrategyConfig mode=live):
+# py-clob-client>=0.17
