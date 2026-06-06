@@ -128,6 +128,52 @@ endpoints. No API keys are needed for *data* (only for live order placement).
 The endpoint field-mapping lives in one place (`marketdata.py`) — verify it
 against live responses before sizing up.
 
+## Finding the best strategy (Monte Carlo)
+
+Before risking anything, sweep filter + sizing strategies over thousands of
+simulated alert streams and let the data pick the most profitable *and*
+consistent one:
+
+```bash
+python simulate.py                         # synthetic, default channel model
+python simulate.py --quick                 # fast, smaller sweep
+python simulate.py --channel-skill 0.0     # stress: a channel with NO edge
+python simulate.py --report-bias 0.10      # channel inflates win rate by +10pp
+python simulate.py --history alerts.jsonl  # backtest on YOUR real alerts
+python simulate.py --save-best             # write the winner into the config
+```
+
+It reuses the **same** filter/sizing/slippage code the live bot runs, so the
+strategy you optimise is the one you deploy. Each candidate is scored across
+paths on median return, downside (p5), probability of loss, probability of
+ruin, average max drawdown, realized win rate, and Sharpe — then ranked by a
+consistency-adjusted `composite` (or `--objective median_return|sharpe|calmar`).
+
+**Two data modes:**
+- **Synthetic** — an explicit channel model with knobs for the channel's real
+  edge (`--channel-skill`), how much it inflates its quoted win rate
+  (`--report-bias`), and price/noise. Outcomes are decided by the *true*
+  probability, so a strategy that blindly trusts inflated win rates gets
+  punished in the sim — which is the point.
+- **Historical** (`--history`) — bootstrap-resample your own logged alerts
+  with known outcomes for a model-free forward test. **This is the most
+  trustworthy mode** — switch to it as soon as you've collected real alerts.
+
+> ⚠️ Synthetic results are only as good as the channel model. Sample run with a
+> skilled channel (`skill=0.03, bias=0.05, slippage=50bps`) favoured a 5%-of-
+> bankroll, `win_rate≥0.55, EV≥5` strategy (~+23% median, 1% ruin); the same
+> sweep against a *no-edge* channel correctly collapsed to a defensive
+> `win_rate≥0.70, fixed 2%` strategy (~+2% median, 0% ruin). **Calibrate to
+> your channel or use `--history` before sizing up.**
+
+A logged-alerts file for `--history` is JSON/JSONL of:
+```json
+{"win_rate": 0.66, "entry_price": 0.45, "outcome": 1, "size": 80}
+```
+The bot already records every alert to SQLite; once positions are settled (via
+`/settle` against real Polymarket resolution) you can export that table to feed
+the backtest.
+
 ## Going live on Polymarket (real money)
 
 Live execution is **off by default** and guarded by four independent gates so
