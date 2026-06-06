@@ -91,3 +91,66 @@ def format_report(ranked: list[StrategyResult], top: int = 10,
             f"{m['avg_win_rate']*100:5.0f} {m['sharpe']:7.2f}"
         )
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------- #
+# Robustness: rank strategies by worst-case behaviour across a scenario panel
+# --------------------------------------------------------------------------- #
+@dataclass
+class RobustResult:
+    name: str
+    config: StrategyConfig
+    per_scenario: dict        # scenario_name -> metrics
+    worst_composite: float
+    mean_composite: float
+    worst_median: float
+    worst_prob_ruin: float
+
+
+def run_robustness(grid, scenario_paths: dict, bankroll: float,
+                   ruin_fraction: float = 0.5) -> list[RobustResult]:
+    """Evaluate every strategy across a panel of scenarios.
+
+    ``scenario_paths``: {scenario_name: paths}. Returns one RobustResult per
+    strategy summarising its *worst-case* and average behaviour across worlds.
+    """
+    out = []
+    for name, cfg in grid:
+        per = {sc: evaluate_strategy(cfg, paths, bankroll, ruin_fraction)
+               for sc, paths in scenario_paths.items()}
+        comps = [m["composite"] for m in per.values()]
+        out.append(RobustResult(
+            name=name, config=cfg, per_scenario=per,
+            worst_composite=min(comps),
+            mean_composite=sum(comps) / len(comps),
+            worst_median=min(m["median_return"] for m in per.values()),
+            worst_prob_ruin=max(m["prob_ruin"] for m in per.values()),
+        ))
+    return out
+
+
+def rank_robust(results: list[RobustResult], max_prob_ruin: float = 0.05,
+                min_avg_bets: float = 3.0) -> list[RobustResult]:
+    def active(r: RobustResult) -> bool:
+        return all(m["avg_bets"] >= min_avg_bets for m in r.per_scenario.values())
+    eligible = [r for r in results
+                if r.worst_prob_ruin <= max_prob_ruin and active(r)]
+    pool = eligible or results
+    # Worst-case composite first (max-min): be good even in the bad world.
+    return sorted(pool, key=lambda r: (r.worst_composite, r.mean_composite),
+                  reverse=True)
+
+
+def format_robust_report(ranked: list[RobustResult], scenarios: list[str],
+                         top: int = 10) -> str:
+    cols = "".join(f"{sc[:10]:>11}" for sc in scenarios)
+    header = f"{'strategy':30}{cols} {'worstMed%':>10} {'worstRuin%':>11}"
+    lines = ["Ranked by worst-case composite across scenarios "
+             "(median return per scenario shown)\n", header, "-" * len(header)]
+    for r in ranked[:top]:
+        cells = "".join(f"{r.per_scenario[sc]['median_return']*100:>10.1f} "
+                        for sc in scenarios)
+        lines.append(f"{r.name:30}{cells}{r.worst_median*100:>10.1f} "
+                     f"{r.worst_prob_ruin*100:>10.0f}")
+    return "\n".join(lines)
+

@@ -22,7 +22,56 @@ from copytradebot.config import StrategyConfig
 from copytradebot.simulation.generator import (
     Scenario, generate_paths, load_history, bootstrap_paths)
 from copytradebot.simulation.optimize import (
-    build_grid, run_optimization, rank, format_report)
+    build_grid, run_optimization, rank, format_report,
+    run_robustness, rank_robust, format_robust_report)
+
+
+# Scenario panel for --robust: pessimistic -> optimistic channel quality.
+ROBUST_PANEL = {
+    "no-edge":  dict(mean_edge=0.00, report_bias=0.08, report_noise=0.10),
+    "weak":     dict(mean_edge=0.02, report_bias=0.06, report_noise=0.08),
+    "base":     dict(mean_edge=0.03, report_bias=0.05, report_noise=0.08),
+    "strong":   dict(mean_edge=0.06, report_bias=0.04, report_noise=0.06),
+}
+
+
+def run_robust_mode(args) -> int:
+    panel = {}
+    for name, kw in ROBUST_PANEL.items():
+        panel[name] = generate_paths(Scenario(**kw), args.paths, args.alerts,
+                                     args.seed)
+    grid = build_grid(args.bankroll, args.slippage_bps, args.fee_bps)
+    print(f"Robustness sweep: {len(grid)} strategies x {len(panel)} scenarios "
+          f"x {args.paths} paths x {args.alerts} alerts")
+    print(f"Costs: slippage={args.slippage_bps}bps fee={args.fee_bps}bps | "
+          f"bankroll={args.bankroll:g}\n")
+
+    results = run_robustness(grid, panel, args.bankroll, args.ruin_fraction)
+    ranked = rank_robust(results)
+    print(format_robust_report(ranked, list(panel), top=args.top))
+
+    best = ranked[0]
+    print("\n" + "=" * 64)
+    print(f"MOST ROBUST (best worst-case): {best.name}")
+    print("=" * 64)
+    for sc in panel:
+        m = best.per_scenario[sc]
+        print(f"  [{sc:8}] median {m['median_return']*100:+6.1f}%  "
+              f"p5 {m['p5_return']*100:+6.1f}%  pLoss {m['prob_loss']*100:3.0f}%  "
+              f"pRuin {m['prob_ruin']*100:3.0f}%  maxDD {m['avg_max_drawdown']*100:3.0f}%")
+    print(f"\n  Worst-case median across scenarios: {best.worst_median*100:+.1f}%")
+    print(f"  Worst-case prob of ruin:            {best.worst_prob_ruin*100:.0f}%")
+
+    if args.save_best:
+        best.config.save(args.config) if args.config else best.config.save()
+        print(f"\n✅ Wrote most-robust strategy to config "
+              f"({args.config or 'config/filters.yaml'}). Review before live.")
+    else:
+        print("\n(Use --save-best to write this strategy into the bot config.)")
+    print("\nNOTE: this is the strategy that holds up across the scenario "
+          "panel.\nFeed real logged alerts with --history once available to "
+          "confirm.")
+    return 0
 
 
 def main() -> int:
@@ -37,6 +86,8 @@ def main() -> int:
     ap.add_argument("--top", type=int, default=12)
     ap.add_argument("--quick", action="store_true",
                     help="smaller, faster sweep")
+    ap.add_argument("--robust", action="store_true",
+                    help="rank by worst-case across a panel of channel scenarios")
     # Channel model (synthetic mode)
     ap.add_argument("--channel-skill", type=float, default=0.03,
                     help="mean true edge over market price (0 = no skill)")
@@ -59,6 +110,9 @@ def main() -> int:
     if args.quick:
         args.paths = min(args.paths, 400)
         args.alerts = min(args.alerts, 80)
+
+    if args.robust and not args.history:
+        return run_robust_mode(args)
 
     # Build alert paths.
     if args.history:
