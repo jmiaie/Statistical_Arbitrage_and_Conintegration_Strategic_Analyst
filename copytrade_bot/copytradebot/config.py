@@ -58,6 +58,20 @@ class RiskConfig:
 
 
 @dataclass
+class ExecutionConfig:
+    """How paper fills are simulated, so results mirror live execution."""
+
+    data_source: str = "none"      # none | polymarket  (live market data)
+    fill_model: str = "alert"      # alert | mid | book
+    slippage_bps: float = 50.0     # flat pad for alert/mid models
+    fee_bps: float = 0.0           # taker fee in bps
+    user_agent: str = "copytrade-bot/0.1"
+    # If True and a live market can't be matched, refuse rather than fall back
+    # to the alert's quoted price (keeps paper results honest).
+    require_live_market: bool = False
+
+
+@dataclass
 class StrategyConfig:
     enabled: bool = True
     mode: str = "paper"           # paper | live
@@ -65,6 +79,7 @@ class StrategyConfig:
     filters: FilterConfig = field(default_factory=FilterConfig)
     sizing: SizingConfig = field(default_factory=SizingConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
+    execution: ExecutionConfig = field(default_factory=ExecutionConfig)
 
     # ---- persistence ---------------------------------------------------- #
     def to_dict(self) -> dict:
@@ -75,6 +90,7 @@ class StrategyConfig:
             "filters": asdict(self.filters),
             "sizing": asdict(self.sizing),
             "risk": asdict(self.risk),
+            "execution": asdict(self.execution),
         }
 
     @classmethod
@@ -87,6 +103,7 @@ class StrategyConfig:
             filters=FilterConfig(**(d.get("filters") or {})),
             sizing=SizingConfig(**(d.get("sizing") or {})),
             risk=RiskConfig(**(d.get("risk") or {})),
+            execution=ExecutionConfig(**(d.get("execution") or {})),
         )
 
     def save(self, path: os.PathLike | str = DEFAULT_FILTERS_PATH) -> None:
@@ -128,6 +145,11 @@ SETTABLE_FIELDS: dict[str, tuple[str, type]] = {
     # risk
     "max_open_positions": ("risk", int),
     "max_daily_loss": ("risk", float),
+    # execution / fill realism
+    "data_source": ("execution", str),    # none | polymarket
+    "fill_model": ("execution", str),     # alert | mid | book
+    "slippage_bps": ("execution", float),
+    "fee_bps": ("execution", float),
 }
 
 

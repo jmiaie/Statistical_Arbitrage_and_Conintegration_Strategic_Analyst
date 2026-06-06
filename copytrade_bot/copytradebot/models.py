@@ -105,3 +105,9 @@ class Position:
     external_id: Optional[str] = None
     opened_at: float = field(default_factory=time.time)
     resolved_at: Optional[float] = None
+    # Realistic-fill bookkeeping. ``entry_price``/``stake`` above hold the
+    # *effective* fill price and total cash deployed (incl. fees); ``shares``
+    # is the contract/share count acquired, and ``meta`` carries provider
+    # references (token/market ids) plus slippage attribution.
+    shares: float = 0.0
+    meta: dict = field(default_factory=dict)

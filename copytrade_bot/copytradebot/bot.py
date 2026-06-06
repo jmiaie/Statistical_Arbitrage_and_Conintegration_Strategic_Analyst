@@ -10,7 +10,7 @@ from .config import StrategyConfig, Settings, SETTABLE_FIELDS, coerce
 from .pipeline import Pipeline
 from .storage import Storage
 from .telegram_client import TelegramClient
-from .executors.paper import PaperExecutor
+from .executors import build_paper_executor, RealisticPaperExecutor
 
 log = logging.getLogger("copytrade.bot")
 
@@ -44,6 +44,9 @@ class CopyTradeBot:
 
     def _save(self) -> None:
         self.config.save(self.settings.filters_path)
+
+    def _paper_executor(self):
+        return build_paper_executor(self.config, self.settings, self.storage)
 
     # ---- main loop ------------------------------------------------------ #
     def run(self) -> None:
@@ -118,7 +121,9 @@ class CopyTradeBot:
             "/require <field,...> — set required parsed fields\n"
             "/stats — performance summary\n"
             "/positions — list open positions\n"
-            "/resolve <id> <win|loss|price> — settle a paper position\n"
+            "/mtm — mark open positions to live market (unrealized P&L)\n"
+            "/settle — auto-settle positions whose markets resolved\n"
+            "/resolve <id> <win|loss|price> — manually settle a position\n"
             "/recent [n] — last n signals with pass/fail reasons\n"
             "/test <alert text> — dry-run an alert through the pipeline\n"
             "Settable keys: " + ", ".join(SETTABLE_FIELDS)
@@ -137,6 +142,8 @@ class CopyTradeBot:
             f"ROI≥{c.filters.min_roi}, ret≥{c.filters.min_expected_return}\n"
             f"Entry [{c.filters.min_entry_price}, {c.filters.max_entry_price}], "
             f"Size [{c.filters.min_size}, {c.filters.max_size}]\n"
+            f"Fills: model={c.execution.fill_model} data={c.execution.data_source} "
+            f"slippage={c.execution.slippage_bps}bps fee={c.execution.fee_bps}bps\n"
             f"Required fields: {c.filters.require_fields}"
         )
 
@@ -228,11 +235,43 @@ class CopyTradeBot:
             pos_id = int(args[0])
         except ValueError:
             return "Position id must be a number."
-        executor = PaperExecutor(self.storage)
-        ok, pnl, status = executor.resolve(pos_id, args[1])
+        ok, pnl, status = self._paper_executor().resolve(pos_id, args[1])
         if not ok:
             return f"Could not resolve #{pos_id} ({status})."
         return f"✅ #{pos_id} settled {status}, P&L {pnl:+.2f}"
+
+    def _cmd_mtm(self, args) -> str:
+        ex = self._paper_executor()
+        if not isinstance(ex, RealisticPaperExecutor):
+            return ("Live mark-to-market needs market data. Enable it with "
+                    "/set data_source polymarket and /set fill_model book.")
+        rows = ex.mark_to_market()
+        if not rows:
+            return "No open positions."
+        lines, total = [], 0.0
+        for r in rows:
+            up = r["unrealized_pnl"]
+            if up is not None:
+                total += up
+            mark = "n/a" if r["mark_price"] is None else f"{r['mark_price']:g}"
+            ups = "n/a" if up is None else f"{up:+.2f}"
+            lines.append(f"#{r['id']} {(r['market'] or '?')[:40]} {r['side']} "
+                         f"@ {r['entry_price']} -> {mark} | uPnL {ups}")
+        return "Mark-to-market:\n" + "\n".join(lines) + f"\nTotal uPnL: {total:+.2f}"
+
+    def _cmd_settle(self, args) -> str:
+        ex = self._paper_executor()
+        if not isinstance(ex, RealisticPaperExecutor):
+            return ("Auto-settle needs market data. Enable it with "
+                    "/set data_source polymarket.")
+        results = ex.settle_resolved()
+        if not results:
+            return "No positions had resolved markets."
+        lines = [f"#{pid} {status} {pnl:+.2f}" for pid, status, pnl in results]
+        return "Settled:\n" + "\n".join(lines)
+
+    def _cmd_pnl(self, args) -> str:
+        return self._cmd_stats(args)
 
     def _cmd_recent(self, args) -> str:
         n = int(args[0]) if args and args[0].isdigit() else 10

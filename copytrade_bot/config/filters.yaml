@@ -29,3 +29,12 @@ sizing:
 risk:
   max_open_positions: 25
   max_daily_loss: 250.0
+
+execution:                    # how paper fills are simulated
+  data_source: none           # none | polymarket  (live market data)
+  fill_model: alert           # alert | mid | book
+  slippage_bps: 50.0          # flat slippage pad for alert/mid models
+  fee_bps: 0.0                # taker fee in basis points
+  user_agent: copytrade-bot/0.1
+  require_live_market: false  # if true, skip when no live market matches
+

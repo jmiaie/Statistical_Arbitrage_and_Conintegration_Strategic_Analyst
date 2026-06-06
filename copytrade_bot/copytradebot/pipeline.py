@@ -65,7 +65,7 @@ class Pipeline:
                             0, 0, 0, 0, 0, -1))
 
     def _executor(self):
-        return build_executor(self.config.mode, self.settings, self.storage)
+        return build_executor(self.config, self.settings, self.storage)
 
     def _risk_ok(self) -> tuple[bool, str]:
         risk = self.config.risk

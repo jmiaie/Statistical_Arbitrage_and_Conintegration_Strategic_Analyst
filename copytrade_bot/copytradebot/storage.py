@@ -39,9 +39,17 @@ CREATE TABLE IF NOT EXISTS positions (
     pnl REAL NOT NULL DEFAULT 0,
     external_id TEXT,
     resolved_at REAL,
+    shares REAL NOT NULL DEFAULT 0,
+    meta TEXT,
     FOREIGN KEY (signal_id) REFERENCES signals(id)
 );
 """
+
+# Columns added after the initial release; applied idempotently on open so
+# existing databases pick them up without a manual migration.
+_MIGRATIONS = {
+    "positions": {"shares": "REAL NOT NULL DEFAULT 0", "meta": "TEXT"},
+}
 
 
 class Storage:
@@ -51,7 +59,17 @@ class Storage:
         self.conn.row_factory = sqlite3.Row
         with closing(self.conn.cursor()) as cur:
             cur.executescript(_SCHEMA)
+            self._migrate(cur)
         self.conn.commit()
+
+    @staticmethod
+    def _migrate(cur) -> None:
+        for table, cols in _MIGRATIONS.items():
+            existing = {row[1] for row in cur.execute(
+                f"PRAGMA table_info({table})")}
+            for name, decl in cols.items():
+                if name not in existing:
+                    cur.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
 
     def close(self) -> None:
         self.conn.close()
@@ -80,15 +98,17 @@ class Storage:
 
     # ---- positions ------------------------------------------------------ #
     def record_position(self, pos: Position) -> int:
+        import json
         cur = self.conn.execute(
             """INSERT INTO positions
                (signal_id, ts, venue, market, side, entry_price, stake,
-                status, pnl, external_id, resolved_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                status, pnl, external_id, resolved_at, shares, meta)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 pos.signal_id, pos.opened_at, pos.venue, pos.market, pos.side,
                 pos.entry_price, pos.stake, pos.status, pos.pnl,
-                pos.external_id, pos.resolved_at,
+                pos.external_id, pos.resolved_at, pos.shares,
+                json.dumps(pos.meta or {}),
             ),
         )
         self.conn.commit()

@@ -88,6 +88,46 @@ Performance & positions:
   `max_position`, `min_position`
 - Risk: `max_open_positions`, `max_daily_loss`
 
+## Realistic paper trading (verify likely outcomes)
+
+Paper trading defaults to a naive fill (alert's quoted price, no costs). To
+make paper results track what live execution would actually produce, turn on
+the realistic engine — it fills against **real Polymarket data** with
+**slippage and fees**, then **auto-settles against the market's real
+resolution**:
+
+```
+/set data_source polymarket    # pull live market data (public, no API key)
+/set fill_model book           # size-aware fills walking the live order book
+/set slippage_bps 50           # extra pad (used by alert/mid models)
+/set fee_bps 0                 # taker fee (Polymarket is 0 today)
+```
+
+Fill models:
+
+| `fill_model` | Fill price | Use when |
+|---|---|---|
+| `alert` | the alert's quoted entry (+ slippage pad) | no market data |
+| `mid`   | live midpoint/ask (+ slippage pad) | quick, book not needed |
+| `book`  | walks the **live order book** so bigger stakes pay up | most realistic |
+
+What you get:
+
+- **Effective fill price + share count** recorded per position, with slippage
+  attribution in `meta` (`reference_price`, `alert_price`, `slippage_bps`,
+  `fee_paid`, `unfilled_stake`).
+- **`/mtm`** — mark every open position to the live market for unrealized P&L.
+- **`/settle`** — auto-settle positions whose Polymarket market has resolved
+  on-chain (real win/loss, real ROI), feeding the rolling win rate in `/stats`.
+- **Honest degradation** — if a live market can't be matched it falls back to
+  the alert price and flags `degraded` in `meta` (or set
+  `require_live_market: true` to skip instead, keeping results pure).
+
+This requires outbound network access to Polymarket's public Gamma + CLOB
+endpoints. No API keys are needed for *data* (only for live order placement).
+The endpoint field-mapping lives in one place (`marketdata.py`) — verify it
+against live responses before sizing up.
+
 ## Going live on Polymarket (real money)
 
 Live execution is **off by default** and guarded by four independent gates so
