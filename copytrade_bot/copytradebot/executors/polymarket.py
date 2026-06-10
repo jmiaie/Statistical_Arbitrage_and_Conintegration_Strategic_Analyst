@@ -20,6 +20,7 @@ piece to harden before trusting it with size.
 
 from __future__ import annotations
 
+import re
 import urllib.parse
 import urllib.request
 import json
@@ -30,6 +31,49 @@ from ..models import Signal, Position, Side
 from ..storage import Storage
 
 GAMMA_API = "https://gamma-api.polymarket.com"
+
+# How confidently we must identify a single market before risking real money.
+_MIN_MATCH_SCORE = 2        # query/question must share at least this many words
+_AMBIGUITY_MARGIN = 1       # best must beat the runner-up by more than this
+
+
+def _words(text: str) -> set[str]:
+    # Drop 1-2 char tokens so stopwords/punctuation don't inflate the score.
+    return {w for w in re.findall(r"\w+", (text or "").lower()) if len(w) > 2}
+
+
+def select_market(markets: list[dict], query: str) -> dict:
+    """Pick the single market that matches ``query``, or refuse.
+
+    Mapping freeform English onto an exact on-chain market is fuzzy, so this is
+    deliberately strict: it ranks candidates by word overlap with the alert's
+    market text and raises :class:`ExecutionError` rather than guess when the
+    best match is weak (< ``_MIN_MATCH_SCORE`` shared words) or ambiguous (a
+    runner-up within ``_AMBIGUITY_MARGIN``). Real funds are at stake here.
+    """
+    qwords = _words(query)
+    if not markets:
+        raise ExecutionError(f"No active Polymarket market matched '{query}'.")
+    if not qwords:
+        raise ExecutionError(
+            "Alert market text has no usable words to match against.")
+
+    scored = sorted(
+        ((len(qwords & _words(str(m.get("question") or m.get("title") or ""))), m)
+         for m in markets),
+        key=lambda s: s[0], reverse=True,
+    )
+    best_score, best = scored[0]
+    if best_score < _MIN_MATCH_SCORE:
+        raise ExecutionError(
+            f"Best Polymarket match for '{query}' is too weak "
+            f"(only {best_score} shared word(s)); refusing to guess.")
+    if len(scored) > 1 and best_score - scored[1][0] <= _AMBIGUITY_MARGIN:
+        raise ExecutionError(
+            f"Ambiguous market match for '{query}' "
+            f"(top candidates score {best_score} vs {scored[1][0]}); "
+            "refusing to guess.")
+    return best
 
 
 class PolymarketExecutor(Executor):
@@ -91,20 +135,26 @@ class PolymarketExecutor(Executor):
             return json.loads(resp.read().decode())
 
     def _resolve_token(self, signal: Signal) -> tuple[str, float]:
-        """Return ``(token_id, best_price)`` for the alert's market & side."""
+        """Return ``(token_id, limit_price)`` for the alert's market & side.
+
+        Refuses (raises) rather than guessing when the market match is weak or
+        ambiguous, when the requested side's outcome token can't be identified,
+        or when the alert carries no entry price — never invents a price.
+        """
         if not signal.market:
             raise ExecutionError("Alert has no parseable market to match.")
+        if signal.entry_price is None:
+            raise ExecutionError(
+                "Alert has no entry price; refusing to invent a limit price "
+                "for a live order.")
 
         markets = self._gamma_get(
             "/markets",
             {"active": "true", "closed": "false", "limit": 20,
              "search": signal.market[:80]},
         )
-        if not markets:
-            raise ExecutionError(f"No active Polymarket market matched "
-                                 f"'{signal.market}'.")
+        market = select_market(markets, signal.market)
 
-        market = markets[0]
         token_ids = market.get("clobTokenIds")
         outcomes = market.get("outcomes")
         if isinstance(token_ids, str):
@@ -114,13 +164,17 @@ class PolymarketExecutor(Executor):
         if not token_ids or not outcomes:
             raise ExecutionError("Matched market is missing CLOB token ids.")
 
-        # Map YES/NO (or BUY->YES, SELL->NO) onto the outcome list.
+        # Map YES/NO (or BUY->YES, SELL->NO) onto the outcome list. Refuse if
+        # the requested side has no matching named outcome — don't fall back to
+        # outcome 0 and silently trade the wrong direction.
         want = "Yes" if signal.side in (Side.YES, Side.BUY, Side.LONG) else "No"
         idx = next((i for i, o in enumerate(outcomes)
-                    if str(o).lower() == want.lower()), 0)
-        token_id = str(token_ids[idx])
-        price = signal.entry_price if signal.entry_price else 0.5
-        return token_id, float(price)
+                    if str(o).strip().lower() == want.lower()), None)
+        if idx is None:
+            raise ExecutionError(
+                f"Could not map side '{signal.side.value}' onto market "
+                f"outcomes {outcomes}; refusing to guess the token.")
+        return str(token_ids[idx]), float(signal.entry_price)
 
     # ---- order placement ------------------------------------------------ #
     def place(self, signal: Signal, stake: float, signal_id: int | None = None) -> Position:

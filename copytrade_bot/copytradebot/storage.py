@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS signals (
     passed INTEGER NOT NULL,
     reasons TEXT
 );
+CREATE TABLE IF NOT EXISTS seen_updates (
+    key TEXT PRIMARY KEY,
+    ts REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS positions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     signal_id INTEGER,
@@ -73,6 +77,20 @@ class Storage:
 
     def close(self) -> None:
         self.conn.close()
+
+    # ---- idempotency ---------------------------------------------------- #
+    def mark_seen(self, key: str) -> bool:
+        """Record an update key; return True only the first time it's seen.
+
+        Used to dedupe Telegram updates so an edited post (same chat+message id)
+        or a redelivered update can't fire the pipeline — and a trade — twice.
+        """
+        cur = self.conn.execute(
+            "INSERT OR IGNORE INTO seen_updates (key, ts) VALUES (?, ?)",
+            (key, time.time()),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
 
     # ---- signals -------------------------------------------------------- #
     def record_signal(self, sig: Signal, result: FilterResult) -> int:

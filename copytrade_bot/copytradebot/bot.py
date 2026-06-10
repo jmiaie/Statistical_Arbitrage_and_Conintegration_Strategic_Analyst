@@ -85,6 +85,14 @@ class CopyTradeBot:
             return
 
         if self._is_source(chat_id):
+            # Dedupe by chat+message id so an edited or redelivered post can't
+            # re-fire a trade. Edits keep the original message_id, so this also
+            # guards against "fixed a typo" reposts. Commands are exempt above.
+            msg_id = msg.get("message_id")
+            if msg_id is not None and not self.storage.mark_seen(
+                    f"{chat_id}:{msg_id}"):
+                log.info("Skipping already-seen update %s:%s", chat_id, msg_id)
+                return
             self._handle_alert(text, chat_id)
 
     def _handle_alert(self, text: str, chat_id: int) -> None:
