@@ -15,6 +15,7 @@ YES/NO token). Exit when the spread reverts toward zero.
 
 from __future__ import annotations
 
+import math
 from itertools import combinations
 
 from .base import Scanner, Opportunity, Leg
@@ -26,19 +27,32 @@ class CointegrationScanner(Scanner):
 
     def __init__(self, lookback: int = 60, entry_z: float = 2.0,
                  adf_threshold: float = -3.0, min_half_life: float = 1.0,
-                 max_half_life: float = 40.0):
+                 max_half_life: float = 40.0, spread: float = 0.02,
+                 multiple_test_correction: bool = True):
         self.lookback = lookback
         self.entry_z = entry_z
         self.adf_threshold = adf_threshold
         self.min_half_life = min_half_life
         self.max_half_life = max_half_life
+        # Pad synthesised leg entry prices by the bid/ask spread (NO legs have
+        # their own book; you pay the ask, not the mid).
+        self.spread = spread
+        # Testing every pair for cointegration inflates false positives. Tighten
+        # the ADF cut by an approximate Bonferroni shift (~sqrt(2 ln m) on the
+        # normal tail) for m pairs tested, so spurious pairs don't slip through.
+        self.multiple_test_correction = multiple_test_correction
 
     def scan(self, series: dict) -> list[Opportunity]:
         """``series``: {market_id: {"question","prices","token_yes","token_no"}}.
         All price lists must be aligned/equal length."""
         opps = []
         ids = list(series)
-        for a_id, b_id in combinations(ids, 2):
+        pairs = list(combinations(ids, 2))
+        # Approximate Bonferroni tightening of the ADF critical value.
+        adf_cut = self.adf_threshold
+        if self.multiple_test_correction and len(pairs) > 1:
+            adf_cut -= math.sqrt(2.0 * math.log(len(pairs)))
+        for a_id, b_id in pairs:
             A, B = series[a_id], series[b_id]
             ya = A["prices"][-self.lookback:]
             yb = B["prices"][-self.lookback:]
@@ -48,9 +62,9 @@ class CointegrationScanner(Scanner):
             alpha, beta, resid = stats.ols(yb, ya)  # ya = alpha + beta*yb
             if beta <= 0:
                 continue
-            # Step 2: stationarity of the spread.
+            # Step 2: stationarity of the spread (Bonferroni-tightened cut).
             t = stats.adf_tstat(resid)
-            if t > self.adf_threshold:
+            if t > adf_cut:
                 continue
             hl = stats.half_life(resid)
             if not (self.min_half_life <= hl <= self.max_half_life):
@@ -60,18 +74,19 @@ class CointegrationScanner(Scanner):
                 continue
 
             # z>0 => A rich vs B => short A (buy NO_A), long B (buy YES_B).
+            sp = self.spread
             if z > 0:
                 legs = [
-                    Leg(a_id, A["question"], "No", round(1 - ya[-1], 4),
+                    Leg(a_id, A["question"], "No", round(1 - ya[-1] + sp, 4),
                         A.get("token_no"), weight=1.0),
-                    Leg(b_id, B["question"], "Yes", round(yb[-1], 4),
+                    Leg(b_id, B["question"], "Yes", round(yb[-1] + sp, 4),
                         B.get("token_yes"), weight=beta),
                 ]
             else:
                 legs = [
-                    Leg(a_id, A["question"], "Yes", round(ya[-1], 4),
+                    Leg(a_id, A["question"], "Yes", round(ya[-1] + sp, 4),
                         A.get("token_yes"), weight=1.0),
-                    Leg(b_id, B["question"], "No", round(1 - yb[-1], 4),
+                    Leg(b_id, B["question"], "No", round(1 - yb[-1] + sp, 4),
                         B.get("token_no"), weight=beta),
                 ]
             # Edge proxy: expected reversion of the spread to its mean, scaled.

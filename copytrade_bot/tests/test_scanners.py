@@ -104,3 +104,35 @@ def test_cointegration_finds_diverged_pair():
     assert len(opps) >= 1
     a_leg = [l for l in opps[0].legs if l.market_id == "A"][0]
     assert a_leg.side == "No"
+
+
+# ---- NO-leg spread honesty ------------------------------------------------ #
+def test_meanreversion_spread_raises_no_entry_and_cuts_edge():
+    prices = [0.50] * 25 + [0.70]
+    hist = {"m": {"question": "q", "prices": prices,
+                  "token_yes": "ty", "token_no": "tn"}}
+    cheap = MeanReversionScanner(lookback=20, entry_z=1.5, spread=0.0).scan(hist)
+    dear = MeanReversionScanner(lookback=20, entry_z=1.5, spread=0.05).scan(hist)
+    # Paying the spread on the NO leg means a higher entry and a smaller edge.
+    assert dear[0].legs[0].price > cheap[0].legs[0].price
+    assert dear[0].edge < cheap[0].edge
+
+
+# ---- multiple-testing correction ------------------------------------------ #
+def test_cointegration_correction_suppresses_spurious_pairs():
+    rng = random.Random(3)
+    # Many independent random walks: any "cointegration" found is spurious.
+    series = {}
+    for k in range(8):
+        p, walk = 0.5, []
+        for _ in range(80):
+            p = min(0.9, max(0.1, p + rng.gauss(0, 0.02)))
+            walk.append(p)
+        series[f"m{k}"] = {"question": f"m{k}", "prices": walk,
+                           "token_yes": f"y{k}", "token_no": f"n{k}"}
+    raw = CointegrationScanner(adf_threshold=-1.5, min_half_life=0.0,
+                               multiple_test_correction=False).scan(series)
+    corrected = CointegrationScanner(adf_threshold=-1.5, min_half_life=0.0,
+                                     multiple_test_correction=True).scan(series)
+    # The Bonferroni-tightened cut should admit no more (typically fewer) pairs.
+    assert len(corrected) <= len(raw)

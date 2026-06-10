@@ -56,7 +56,9 @@ def lab_arbitrage(seed, n=5000, buffer=0.01):
 
 def lab_longshot(seed, n=20000, slip=0.005):
     rng = random.Random(seed)
-    sc = LongshotScanner(min_edge=0.005)
+    # spread=0 here: the lab models the fill cost itself via `slip` below, so
+    # the scanner shouldn't also pad the price (avoid double-counting).
+    sc = LongshotScanner(min_edge=0.005, spread=0.0)
     rets = []
     for i in range(n):
         p = rng.uniform(0.05, 0.95)
@@ -88,7 +90,7 @@ def lab_mean_reversion(seed, paths=3000, length=60, hold=5, slip=0.005,
                        news_prob=0.15):
     rng = random.Random(seed)
     sc = MeanReversionScanner(lookback=20, entry_z=2.0, max_move=0.25,
-                              min_edge=0.005)
+                              min_edge=0.005, spread=0.0)  # lab adds slip itself
     rets = []
     for _ in range(paths):
         prices = _ar1_series(rng, length, mean=rng.uniform(0.35, 0.65),
@@ -113,7 +115,7 @@ def lab_mean_reversion(seed, paths=3000, length=60, hold=5, slip=0.005,
 def lab_cointegration(seed, pairs=3000, length=80, hold=8, slip=0.005):
     rng = random.Random(seed)
     sc = CointegrationScanner(lookback=60, entry_z=2.0, adf_threshold=-2.5,
-                              min_half_life=0.0, max_half_life=40)
+                              min_half_life=0.0, max_half_life=40, spread=0.0)
     rets = []
     for _ in range(pairs):
         # B random walk; spread mean-reverts; A = B + spread.

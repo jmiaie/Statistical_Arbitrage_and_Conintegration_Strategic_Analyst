@@ -19,11 +19,16 @@ class MeanReversionScanner(Scanner):
     kind = "meanreversion"
 
     def __init__(self, lookback: int = 20, entry_z: float = 2.0,
-                 max_move: float = 0.25, min_edge: float = 0.01):
+                 max_move: float = 0.25, min_edge: float = 0.01,
+                 spread: float = 0.02):
         self.lookback = lookback
         self.entry_z = entry_z
         self.max_move = max_move      # skip if recent move exceeds this (news)
         self.min_edge = min_edge
+        # You pay the ask, not the mid/last in the price series, and the NO leg
+        # has its own book — pad the entry by the spread so the edge isn't
+        # overstated by the full bid/ask.
+        self.spread = spread
 
     def scan(self, histories: dict) -> list[Opportunity]:
         """``histories``: {market_id: (question, [price, ...], token_yes,
@@ -42,12 +47,12 @@ class MeanReversionScanner(Scanner):
             if z >= self.entry_z:
                 # YES overshot up -> fade by buying NO (cheap now)
                 side, token = "No", tok_no
-                entry = 1 - prices[-1]
+                entry = (1 - prices[-1]) + self.spread
                 target = 1 - mu
             elif z <= -self.entry_z:
                 # YES overshot down -> buy YES cheap, expect reversion up
                 side, token = "Yes", tok_yes
-                entry = prices[-1]
+                entry = prices[-1] + self.spread
                 target = mu
             else:
                 continue

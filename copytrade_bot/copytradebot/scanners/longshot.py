@@ -29,11 +29,15 @@ class LongshotScanner(Scanner):
 
     def __init__(self, favorite_threshold: float = 0.65,
                  longshot_threshold: float = 0.20, min_edge: float = 0.01,
-                 bias_at=default_bias):
+                 bias_at=default_bias, spread: float = 0.02):
         self.fav = favorite_threshold
         self.long = longshot_threshold
         self.min_edge = min_edge
         self.bias_at = bias_at
+        # Cost of the *opposite* outcome isn't 1-price: NO has its own book, so
+        # synthesising it from the YES price understates what you'd pay by about
+        # the bid/ask spread. Pad the synthesised opposite price accordingly.
+        self.spread = spread
 
     def scan(self, snapshots: list[MarketSnapshot]) -> list[Opportunity]:
         opps = []
@@ -50,8 +54,8 @@ class LongshotScanner(Scanner):
                     side, entry = oc, price
                 elif price <= self.long:
                     bias = self.bias_at(price)            # negative
-                    # fade the longshot -> buy opposite at (1-price)
-                    opp_price = 1 - price
+                    # fade the longshot -> buy opposite at (1-price) + spread
+                    opp_price = min(0.99, (1 - price) + self.spread)
                     true_opp = min(0.99, opp_price - bias)  # opposite gains
                     edge = true_opp * (1 / opp_price - 1) - (1 - true_opp)
                     side, entry = ("No" if oc.lower() == "yes" else "Yes"), opp_price
