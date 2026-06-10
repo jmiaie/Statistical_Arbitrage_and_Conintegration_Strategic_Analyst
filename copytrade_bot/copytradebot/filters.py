@@ -44,7 +44,8 @@ class FilterEngine:
 
         # Numeric thresholds — only enforced when both the bound and the value
         # are present. A missing value is handled via require_fields above.
-        self._min(result, "win rate", signal.win_rate, c.min_win_rate)
+        # Gate on the calibrated win rate when available (falls back to quoted).
+        self._min(result, "win rate", signal.effective_win_rate(), c.min_win_rate)
         self._min(result, "EV", signal.ev, c.min_ev)
         self._min(result, "ROI", signal.roi, c.min_roi)
         self._min(result, "expected return", signal.expected_return,

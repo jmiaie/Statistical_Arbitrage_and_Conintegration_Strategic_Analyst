@@ -80,6 +80,9 @@ class StrategyConfig:
     enabled: bool = True
     mode: str = "paper"           # paper | live
     dry_run: bool = False         # if True, never actually place (even paper)
+    # Correct each source's quoted win rate against its realized history before
+    # filtering/sizing. Safe to leave on: a no-evidence source is unchanged.
+    calibrate: bool = True
     filters: FilterConfig = field(default_factory=FilterConfig)
     sizing: SizingConfig = field(default_factory=SizingConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
@@ -91,6 +94,7 @@ class StrategyConfig:
             "enabled": self.enabled,
             "mode": self.mode,
             "dry_run": self.dry_run,
+            "calibrate": self.calibrate,
             "filters": asdict(self.filters),
             "sizing": asdict(self.sizing),
             "risk": asdict(self.risk),
@@ -104,6 +108,7 @@ class StrategyConfig:
             enabled=d.get("enabled", True),
             mode=d.get("mode", "paper"),
             dry_run=d.get("dry_run", False),
+            calibrate=d.get("calibrate", True),
             filters=FilterConfig(**(d.get("filters") or {})),
             sizing=SizingConfig(**(d.get("sizing") or {})),
             risk=RiskConfig(**(d.get("risk") or {})),

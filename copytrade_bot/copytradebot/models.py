@@ -67,11 +67,20 @@ class Signal:
     market: Optional[str] = None
     side: Side = Side.UNKNOWN
     win_rate: Optional[float] = None
+    # Set by the calibration layer: the source-corrected win rate used for
+    # filtering and sizing. ``win_rate`` always holds the original quote.
+    calibrated_win_rate: Optional[float] = None
     ev: Optional[float] = None
     roi: Optional[float] = None
     expected_return: Optional[float] = None
     entry_price: Optional[float] = None
     size: Optional[float] = None
+
+    def effective_win_rate(self) -> Optional[float]:
+        """Calibrated win rate when available, else the quoted one. This is the
+        value filters and sizing should trust."""
+        return (self.calibrated_win_rate if self.calibrated_win_rate is not None
+                else self.win_rate)
 
     def present_fields(self) -> set[str]:
         """Which numeric/market fields were successfully extracted."""

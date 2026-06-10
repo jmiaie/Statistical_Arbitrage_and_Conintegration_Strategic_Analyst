@@ -129,6 +129,8 @@ class CopyTradeBot:
             "/get <key> — show one setting\n"
             "/enable | /disable — master on/off switch\n"
             "/mode paper|live — switch execution venue\n"
+            "/calibrate on|off — correct quoted win rates vs realized history\n"
+            "/calibration — per-source quoted vs realized win rate + bias\n"
             "/dryrun on|off — evaluate without placing\n"
             "/require <field,...> — set required parsed fields\n"
             "/stats — performance summary\n"
@@ -160,6 +162,7 @@ class CopyTradeBot:
             + f", max open {c.risk.max_open_positions}\n"
             f"Fills: model={c.execution.fill_model} data={c.execution.data_source} "
             f"slippage={c.execution.slippage_bps}bps fee={c.execution.fee_bps}bps\n"
+            f"Calibration: {'on' if c.calibrate else 'off'} | "
             f"Required fields: {c.filters.require_fields}"
         )
 
@@ -209,6 +212,28 @@ class CopyTradeBot:
         self._save()
         return f"✅ Mode set to {new_mode}." + (
             " 🔴 REAL MONEY AT RISK." if new_mode == "live" else "")
+
+    def _cmd_calibrate(self, args) -> str:
+        if not args or args[0].lower() not in {"on", "off"}:
+            return "Usage: /calibrate on|off"
+        self.config.calibrate = args[0].lower() == "on"
+        self._save()
+        return f"✅ calibration = {self.config.calibrate}"
+
+    def _cmd_calibration(self, args) -> str:
+        """Show per-source quoted-vs-realized win rate and the applied bias."""
+        from .calibration import Calibrator
+        rows = self.storage.calibration_rows()
+        report = Calibrator.from_rows(rows).report()
+        if not report:
+            return ("No settled history yet. Calibration applies once positions "
+                    "are resolved (via /resolve or /settle).")
+        lines = ["source            n  quoted realized   bias"]
+        for r in report:
+            lines.append(f"{(r['source'] or '?')[:16]:16} {r['n']:3d}  "
+                         f"{r['quoted']*100:5.0f}% {r['realized']*100:6.0f}% "
+                         f"{r['bias']*100:+5.0f}pp")
+        return "\n".join(lines)
 
     def _cmd_dryrun(self, args) -> str:
         if not args or args[0].lower() not in {"on", "off"}:

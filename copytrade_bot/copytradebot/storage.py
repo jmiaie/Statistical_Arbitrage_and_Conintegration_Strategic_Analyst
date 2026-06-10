@@ -196,6 +196,17 @@ class Storage:
         ).fetchone()
         return float(row["p"])
 
+    # ---- calibration ---------------------------------------------------- #
+    def calibration_rows(self) -> list[tuple]:
+        """``(source, quoted_win_rate, won)`` for every settled position whose
+        originating signal carried a quoted win rate. Feeds the Calibrator."""
+        rows = self.conn.execute(
+            "SELECT s.source AS source, s.win_rate AS quoted, p.status AS status "
+            "FROM positions p JOIN signals s ON p.signal_id = s.id "
+            "WHERE p.status IN ('won','lost') AND s.win_rate IS NOT NULL"
+        )
+        return [(r["source"], r["quoted"], r["status"] == "won") for r in rows]
+
     # ---- stats ---------------------------------------------------------- #
     def stats(self) -> dict:
         c = self.conn

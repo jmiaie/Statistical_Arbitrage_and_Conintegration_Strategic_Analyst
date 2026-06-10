@@ -12,6 +12,7 @@ from .models import Signal, FilterResult, Position, Intent
 from .parser import parse_alert, enrich
 from .sizing import compute_stake
 from .storage import Storage
+from .calibration import Calibrator
 from .executors import build_executor
 
 
@@ -41,7 +42,11 @@ class Decision:
         if s.side.value != "UNKNOWN":
             bits.append(s.side.value)
         if s.win_rate is not None:
-            bits.append(f"WR {s.win_rate*100:.0f}%")
+            wr = f"WR {s.win_rate*100:.0f}%"
+            if (s.calibrated_win_rate is not None
+                    and abs(s.calibrated_win_rate - s.win_rate) >= 0.005):
+                wr += f"→{s.calibrated_win_rate*100:.0f}% cal"
+            bits.append(wr)
         if s.ev is not None:
             bits.append(f"EV {s.ev:+g}%")
         if s.roi is not None:
@@ -239,8 +244,20 @@ class Pipeline:
             decision.note = "exit matched positions but none could be closed"
         return decision
 
+    def _apply_calibration(self, signal: Signal) -> None:
+        """Set the calibrated win rate from the source's settled history.
+
+        Leaves ``signal.win_rate`` (the quote) intact so it's still what we
+        record — only the *effective* value used for filtering/sizing changes.
+        """
+        if not self.config.calibrate or signal.win_rate is None:
+            return
+        cal = Calibrator.from_rows(self.storage.calibration_rows())
+        signal.calibrated_win_rate = cal.calibrate(signal.source, signal.win_rate)
+
     def process(self, text: str, source: str = "unknown") -> Decision:
         signal = enrich(parse_alert(text, source))
+        self._apply_calibration(signal)
         engine = FilterEngine(self.config.filters)
         result = engine.evaluate(signal)
         signal_id = self.storage.record_signal(signal, result)

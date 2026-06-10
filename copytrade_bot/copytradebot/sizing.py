@@ -28,7 +28,10 @@ def compute_stake(signal: Signal, cfg: SizingConfig) -> float:
     if mode == "fixed":
         stake = cfg.fixed_amount
     elif mode == "kelly":
-        wr = signal.win_rate if signal.win_rate is not None else 0.0
+        # Size off the calibrated win rate, not the channel's raw quote — Kelly
+        # on an inflated win rate is the most dangerous default in the system.
+        wr = signal.effective_win_rate()
+        wr = wr if wr is not None else 0.0
         price = signal.entry_price if signal.entry_price is not None else 0.0
         f = kelly_fraction(wr, price) * cfg.kelly_fraction
         stake = cfg.bankroll * f
