@@ -98,9 +98,13 @@ class CopyTradeBot:
     def _handle_alert(self, text: str, chat_id: int) -> None:
         source = str(chat_id)
         decision = self.pipeline.process(text, source=source)
-        log.info("Alert from %s -> placed=%s", source, decision.placed)
-        # Notify on every passed trade; skips only when in dry/verbose contexts.
-        if decision.placed or decision.note.startswith(("dry-run", "blocked", "execution")):
+        log.info("Alert from %s -> placed=%s closed=%s", source,
+                 decision.placed, len(decision.closed))
+        # Notify on every placed trade or executed close, plus dry/blocked/error
+        # contexts. Also surface an exit that matched positions but couldn't act.
+        if (decision.placed or decision.closed
+                or decision.signal.intent.value == "EXIT"
+                or decision.note.startswith(("dry-run", "blocked", "execution"))):
             self._notify(decision.summary())
 
     # ---- commands ------------------------------------------------------- #

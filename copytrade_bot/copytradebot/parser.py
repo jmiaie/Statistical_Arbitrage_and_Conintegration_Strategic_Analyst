@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from .models import Signal, Side
+from .models import Signal, Side, Intent
 
 # Up to 12 non-digit, same-line characters may sit between a label and its
 # value ("Win rate of 65%", "EV: +14%", "Entry ~ 0.42").
@@ -48,11 +48,38 @@ ENTRY_PATTERNS = _compile([
     r"entry\s*price", r"\bentry\b", r"buy\s*at", r"fill", r"limit", r"\bprice\b",
     r"@",
 ])
+# Exit-price phrasing, only consulted for EXIT alerts ("closed at 0.82",
+# "sold @ .80", "out at 0.9"). Kept separate from ENTRY_PATTERNS so an exit
+# message doesn't accidentally pick up an unrelated number.
+EXIT_PRICE_PATTERNS = _compile([
+    r"out\s*at", r"clos\w*\s*at", r"sold\s*at", r"sell\s*at", r"exit\w*\s*at",
+    r"exit\w*", r"@",
+])
 SIZE_PATTERNS = [
     re.compile(lbl + _GAP + r"\$?\s*([\d,]+(?:\.\d+)?)", re.IGNORECASE)
     for lbl in [r"suggested\s*size", r"\bsize\b", r"\bstake\b", r"\bbet\b",
                 r"\brisk\b", r"allocate", r"\bamount\b", r"position\s*size"]
 ]
+
+# Exit / close intent. Conservative: only fire on phrasing that clearly means
+# "get out of / reduce an existing position", not on entry words like "buy".
+# Completion-style phrasing only — "take profit"/"TP" as a target level in an
+# entry alert must NOT trip this, so we require a "hit/took/reached" cue.
+EXIT_PATTERN = re.compile(
+    r"\b(clos(?:e|ing|ed)|exit(?:ing|ed)?|sold|sell(?:ing)?\s+(?:out|all|half|"
+    r"my|the)|stopped?\s*out|stop\s*hit|took\s*profit|profit\s*taken|"
+    r"tp\s*hit|(?:take\s*profit|target)\s*(?:hit|reached)|"
+    r"scal(?:e|ing)\s*out|trim(?:ming|med)?|cash(?:ing)?\s*out|book(?:ing|ed)?\s*"
+    r"(?:profit|gains?)|out\s+of)\b",
+    re.IGNORECASE,
+)
+# An explicit "open/entry/new" cue overrides a stray exit word ("open a new
+# position and close the gap" should still be an entry).
+ENTRY_CUE_PATTERN = re.compile(
+    r"\b(new\s*(?:play|trade|position|entry|signal)|enter(?:ing)?|opening|"
+    r"\bentry\b|fresh\s*(?:long|short|position))\b",
+    re.IGNORECASE,
+)
 
 SIDE_PATTERN = re.compile(
     r"\b(YES|NO|LONG|SHORT|BUY|SELL|OVER|UNDER|BULL|BEAR|CALL|PUT)\b",
@@ -118,6 +145,14 @@ def _extract_market(text: str) -> Optional[str]:
     return None
 
 
+def _extract_intent(text: str) -> Intent:
+    """EXIT only when close/exit phrasing is present and no explicit entry cue
+    overrides it; otherwise ENTRY."""
+    if EXIT_PATTERN.search(text) and not ENTRY_CUE_PATTERN.search(text):
+        return Intent.EXIT
+    return Intent.ENTRY
+
+
 def _extract_side(text: str) -> Side:
     m = SIDE_LABEL_PATTERN.search(text)
     if m:
@@ -139,16 +174,27 @@ def parse_alert(text: str, source: str = "unknown") -> Signal:
     if text is None:
         text = ""
 
+    intent = _extract_intent(text)
+    # For an exit, ``entry_price`` carries the *referenced* (exit) price; prefer
+    # exit-specific phrasing, falling back to the generic price patterns.
+    if intent is Intent.EXIT:
+        price = _num(EXIT_PRICE_PATTERNS, text)
+        if price is None:
+            price = _num(ENTRY_PATTERNS, text)
+    else:
+        price = _num(ENTRY_PATTERNS, text)
+
     return Signal(
         raw_text=text,
         source=source,
+        intent=intent,
         market=_extract_market(text),
         side=_extract_side(text),
         win_rate=_extract_win_rate(text),
         ev=_num(EV_PATTERNS, text),
         roi=_num(ROI_PATTERNS, text),
         expected_return=_num(RETURN_PATTERNS, text),
-        entry_price=_num(ENTRY_PATTERNS, text),
+        entry_price=price,
         size=_num(SIZE_PATTERNS, text),
     )
 

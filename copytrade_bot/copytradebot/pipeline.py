@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from .config import StrategyConfig, Settings
 from .filters import FilterEngine
-from .models import Signal, FilterResult, Position
+from .models import Signal, FilterResult, Position, Intent
 from .parser import parse_alert, enrich
 from .sizing import compute_stake
 from .storage import Storage
@@ -24,9 +24,18 @@ class Decision:
     position: Optional[Position] = None
     placed: bool = False
     note: str = ""
+    # For EXIT alerts: (position_id, status, pnl) for each position closed.
+    closed: list = field(default_factory=list)
 
     def summary(self) -> str:
         s = self.signal
+        if s.intent is Intent.EXIT:
+            if self.closed:
+                rows = ", ".join(f"#{pid} {st} {pnl:+g}"
+                                 for pid, st, pnl in self.closed)
+                return f"💰 CLOSE · {s.market or 'unknown market'}\n{rows}"
+            return (f"🚫 CLOSE · {s.market or 'unknown market'}\n"
+                    f"{self.note or 'no matching open position'}")
         head = f"{'✅ TRADE' if self.placed else '🚫 SKIP'} · {s.market or 'unknown market'}"
         bits = []
         if s.side.value != "UNKNOWN":
@@ -89,6 +98,62 @@ class Pipeline:
                            f"{cap:.2f} = {frac:g}x bankroll)")
         return True, ""
 
+    def _process_exit(self, signal: Signal, decision: Decision) -> Decision:
+        """Settle the open position(s) an exit/close alert refers to.
+
+        Matches by market word-overlap so an exit only ever closes related
+        trades. Prices the close from the alert's stated exit price, falling
+        back to a live mark (realistic executor) — and refuses to guess a price
+        rather than fabricate P&L. Live-mode exits aren't auto-handled yet.
+        """
+        if self.config.dry_run:
+            decision.note = "dry-run: exit not executed"
+            return decision
+        if (self.config.mode or "paper").lower() == "live":
+            decision.note = ("exit detected but live-mode auto-close is not "
+                             "supported yet; close manually on Polymarket")
+            return decision
+        if not signal.market:
+            decision.note = "exit had no market text to match an open position"
+            return decision
+
+        matches = self.storage.find_open_by_market(signal.market)
+        if not matches:
+            decision.note = f"no open position matched '{signal.market}'"
+            return decision
+
+        executor = self._executor()
+        if not hasattr(executor, "resolve"):
+            decision.note = "active executor cannot close positions"
+            return decision
+
+        # Live marks (only available on the realistic executor) let us price an
+        # exit that didn't state a price.
+        marks = {}
+        if signal.entry_price is None and hasattr(executor, "mark_to_market"):
+            try:
+                marks = {r["id"]: r.get("mark_price")
+                         for r in executor.mark_to_market()}
+            except Exception:  # network/provider issues shouldn't crash a close
+                marks = {}
+
+        for row in matches:
+            price = signal.entry_price
+            if price is None:
+                price = marks.get(row["id"])
+            if price is None:
+                if not decision.note:
+                    decision.note = ("matched open position(s) but no exit price "
+                                     "available; use /resolve <id> <win|loss|price>")
+                continue
+            ok, pnl, status = executor.resolve(row["id"], str(price))
+            if ok:
+                decision.closed.append((row["id"], status, pnl))
+
+        if not decision.closed and not decision.note:
+            decision.note = "exit matched positions but none could be closed"
+        return decision
+
     def process(self, text: str, source: str = "unknown") -> Decision:
         signal = enrich(parse_alert(text, source))
         engine = FilterEngine(self.config.filters)
@@ -99,6 +164,11 @@ class Pipeline:
         if not self.config.enabled:
             decision.note = "bot disabled"
             return decision
+
+        # Exit/close alerts never open a position; they settle matching ones.
+        if signal.intent is Intent.EXIT:
+            return self._process_exit(signal, decision)
+
         if not result.passed:
             return decision
 

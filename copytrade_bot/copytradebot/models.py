@@ -8,6 +8,18 @@ from enum import Enum
 from typing import Optional
 
 
+class Intent(str, Enum):
+    """Whether an alert opens a new position or closes/updates an existing one.
+
+    Defaults to ENTRY: only explicit close/exit phrasing flips it, because
+    wrongly opening on an exit message (the old behaviour) and wrongly closing
+    on an entry message are both harmful — ENTRY preserves intent for the
+    common case and exits are detected conservatively."""
+
+    ENTRY = "ENTRY"
+    EXIT = "EXIT"
+
+
 class Side(str, Enum):
     """Direction of a trade. Kept broad to cover equities, crypto and
     prediction markets (Polymarket YES/NO)."""
@@ -51,6 +63,7 @@ class Signal:
     source: str = "unknown"
     received_at: float = field(default_factory=time.time)
 
+    intent: Intent = Intent.ENTRY
     market: Optional[str] = None
     side: Side = Side.UNKNOWN
     win_rate: Optional[float] = None
@@ -74,6 +87,7 @@ class Signal:
     def to_dict(self) -> dict:
         d = asdict(self)
         d["side"] = self.side.value
+        d["intent"] = self.intent.value
         return d
 
 

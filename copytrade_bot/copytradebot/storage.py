@@ -145,6 +145,29 @@ class Storage:
         ).fetchone()
         return float(row["s"])
 
+    def find_open_by_market(self, query: str) -> list[sqlite3.Row]:
+        """Open positions whose market shares words with ``query``.
+
+        Used to route an exit/close alert to the position(s) it refers to.
+        Returns the best-matching open positions (most shared words first);
+        empty when nothing meaningfully matches, so an exit can't blindly close
+        unrelated trades.
+        """
+        import re
+        qwords = {w for w in re.findall(r"\w+", (query or "").lower())
+                  if len(w) > 2}
+        if not qwords:
+            return []
+        scored = []
+        for row in self.open_positions():
+            mwords = {w for w in re.findall(r"\w+", (row["market"] or "").lower())
+                      if len(w) > 2}
+            score = len(qwords & mwords)
+            if score:
+                scored.append((score, row))
+        scored.sort(key=lambda s: s[0], reverse=True)
+        return [row for _, row in scored]
+
     def count_open_positions(self) -> int:
         row = self.conn.execute(
             "SELECT COUNT(*) AS n FROM positions WHERE status='open'"
