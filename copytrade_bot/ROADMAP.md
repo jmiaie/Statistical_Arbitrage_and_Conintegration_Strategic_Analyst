@@ -50,24 +50,27 @@ suite at 66 passing).
    gate on basket-level edge/confidence, size once and split by leg weight, and link legs via a
    shared `signal_id`. Unblocks arbitrage + cointegration execution.
 
-**Remaining P0 follow-ups (smaller, not yet done):** NO-leg pricing optimism (scanners price
-NO at `1−YES_ask`, ignoring its own spread); Kelly sizing still keys off the channel's *quoted*
-win rate (real fix is the P1 calibration layer); cointegration multiple-testing control.
+**P0 follow-ups — done:**
+- ✅ NO-leg pricing: scanners pad synthesised opposite-side prices by a `spread` knob
+  (default 0.02) so the *edge* used for gating isn't overstated.
+- ✅ Kelly: now sizes off the calibrated win rate (see P1 below), not the raw quote.
+- ✅ Cointegration multiple-testing: approximate-Bonferroni tightening of the ADF cut.
 
 ## Phased plan
 
 **P0 — Safety floor (before any live dollar):** ✅ items 1–5 complete. Follow-ups above remain.
 
 **P1 — Real-data validation (no money at risk):**
-- Scanner daemon: poll Gamma for active markets on a schedule, build snapshots/series, run
-  scanners, log opportunities to SQLite, route through the realistic paper engine. Converts
-  scanners from synthetic toys into evidence generators (expected finding: arb is rare/instantly
-  taken — that's a result, not a failure).
-- Longshot calibration script: resolved markets → realized frequency vs. price → fitted bias curve.
-- **Channel calibration layer (the durable edge):** per source, compare quoted vs. realized win
-  rate over settled positions; shrink quoted WR before filtering/Kelly. Kelly on an inflated WR
-  is the most dangerous default in the system; calibration is what makes copy-trading safe.
-- Parser hardening on real alerts from the user's channels (blocked on samples).
+- ✅ **Channel calibration layer (the durable edge) — done.** `calibration.py` shrinks each
+  source's quoted win rate toward its realized settled rate by sample size; wired into the
+  filter and Kelly sizing via `Signal.effective_win_rate()`; `/calibration` reports per-source
+  quoted-vs-realized bias. Safe on by default (no-history sources are unchanged).
+- ⏳ Scanner daemon: poll Gamma for active markets on a schedule, build snapshots/series, run
+  scanners, log opportunities to SQLite, route through `place_opportunity` + the realistic paper
+  engine. Converts scanners from synthetic toys into evidence generators (expected finding: arb
+  is rare/instantly taken — that's a result, not a failure).
+- ⏳ Longshot calibration script: resolved markets → realized frequency vs. price → fitted curve.
+- ⏳ Parser hardening on real alerts from the user's channels (blocked on samples).
 
 **P2 — Live, tiny:**
 - Arbitrage first, $5–10 legs, as an execution shakedown (order placement, fills, settlement).

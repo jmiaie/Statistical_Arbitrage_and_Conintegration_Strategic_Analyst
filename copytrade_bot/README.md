@@ -8,23 +8,33 @@ and routes the survivors to a pluggable **executor** — paper trading now, live
 **Polymarket** when you're ready to put money at risk.
 
 ```
-Telegram alert ─▶ parse ─▶ enrich ─▶ filter ─▶ size ─▶ risk gate ─▶ executor
-                  │          │          │         │                    │
-              regex/heur  derive EV  thresholds  Kelly/frac      paper | polymarket
+Telegram alert ─▶ parse ─▶ enrich ─▶ calibrate ─▶ filter ─▶ size ─▶ risk gate ─▶ executor
+                  │          │          │            │         │         │           │
+              regex/heur  derive EV  per-source   thresholds Kelly/frac exposure  paper |
+              + intent              WR correction                       + caps    polymarket
                                       (adjustable, persisted to YAML, live via /set)
 ```
+
+Entry alerts open positions; **exit alerts** ("closing NVDA", "sold out", "TP
+hit", "out at 0.82") settle the matching open position instead of opening a new
+one. Each source's **quoted win rate is calibrated** against its realized
+settled outcomes before it reaches the filter and Kelly sizing.
 
 ## Why each piece exists
 
 | Concern | Where | Notes |
 |---|---|---|
-| Read alerts | `telegram_client.py` | Bot API long-polling, `requests` only |
-| Understand alerts | `parser.py` | Tolerant regexes; `enrich()` derives EV from win-rate + price for prediction markets |
+| Read alerts | `telegram_client.py` | Bot API long-polling, `requests` only; updates deduped by message id |
+| Understand alerts | `parser.py` | Tolerant regexes; entry/exit **intent**; `enrich()` derives EV from win-rate + price |
+| Calibrate | `calibration.py` | Shrink each source's quoted win rate toward its realized rate |
 | Decide | `filters.py` + `config.py` | Every threshold is adjustable and persisted |
-| Size | `sizing.py` | `fixed` / `fraction` / fractional-`kelly` |
+| Size | `sizing.py` | `fixed` / `fraction` / fractional-`kelly` (off the *calibrated* win rate) |
 | Execute | `executors/` | `paper.py` (simulated) and `polymarket.py` (live, guarded) |
-| Remember | `storage.py` | SQLite: signals, positions, P&L, win rate |
+| Remember | `storage.py` | SQLite: signals, positions, P&L, win rate, dedup, exposure |
 | Control | `bot.py` | Telegram command surface |
+
+See [`ROADMAP.md`](ROADMAP.md) for the project review, what's safe to trade,
+and the phased plan.
 
 ## Quick start
 
@@ -62,9 +72,15 @@ Settings live in `config/filters.yaml` and can be changed **live from Telegram**
 /set max_position 250         hard cap per trade
 /require win_rate,ev          require these fields be parsed
 /dryrun on                    evaluate + size but don't place
+/calibrate on|off             correct quoted win rates vs realized history
+/calibration                  per-source quoted vs realized win rate + bias
 /enable | /disable            master switch
 /test <alert>                 dry-run any alert text through the filters
 ```
+
+Once positions settle, `/calibration` shows each source's quoted vs. realized
+win rate and the bias being applied — the channels that overstate get
+discounted automatically.
 
 Performance & positions:
 
@@ -86,7 +102,9 @@ Performance & positions:
 - `blocked_keywords`, `allowed_sources`, `blocked_sources`
 - Sizing: `mode`, `fixed_amount`, `bankroll`, `fraction`, `kelly_fraction`,
   `max_position`, `min_position`
-- Risk: `max_open_positions`, `max_daily_loss`
+- Risk: `max_open_positions`, `max_daily_loss`, `max_exposure_fraction`
+  (caps total open stake as a fraction of bankroll; the daily-loss window rolls
+  over each day)
 
 ## Realistic paper trading (verify likely outcomes)
 
