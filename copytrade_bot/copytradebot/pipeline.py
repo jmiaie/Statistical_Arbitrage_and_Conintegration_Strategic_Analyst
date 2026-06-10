@@ -56,7 +56,6 @@ class Pipeline:
         self.config = config
         self.settings = settings
         self.storage = storage
-        self._day_start = self._today_start()
 
     @staticmethod
     def _today_start() -> float:
@@ -71,9 +70,23 @@ class Pipeline:
         risk = self.config.risk
         if self.storage.count_open_positions() >= risk.max_open_positions:
             return False, f"max open positions ({risk.max_open_positions}) reached"
-        loss = -self.storage.realized_pnl_since(self._day_start)
+        # Recompute the day boundary each call so the daily loss limit actually
+        # rolls over (it must not be frozen at process-start).
+        loss = -self.storage.realized_pnl_since(self._today_start())
         if loss >= risk.max_daily_loss:
             return False, f"daily loss limit hit ({loss:.2f} >= {risk.max_daily_loss})"
+        return True, ""
+
+    def _exposure_ok(self, stake: float) -> tuple[bool, str]:
+        """Reject a prospective stake that would breach the total-exposure cap."""
+        frac = self.config.risk.max_exposure_fraction
+        if frac is None:
+            return True, ""
+        cap = self.config.sizing.bankroll * frac
+        projected = self.storage.open_exposure() + stake
+        if projected > cap:
+            return (False, f"exposure cap hit (open+new {projected:.2f} > "
+                           f"{cap:.2f} = {frac:g}x bankroll)")
         return True, ""
 
     def process(self, text: str, source: str = "unknown") -> Decision:
@@ -96,6 +109,11 @@ class Pipeline:
 
         stake = compute_stake(signal, self.config.sizing)
         decision.stake = stake
+
+        ok, why = self._exposure_ok(stake)
+        if not ok:
+            decision.note = f"blocked by risk: {why}"
+            return decision
 
         if self.config.dry_run:
             decision.note = f"dry-run: would stake {stake:g}"

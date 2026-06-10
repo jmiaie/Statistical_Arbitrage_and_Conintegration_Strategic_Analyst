@@ -150,6 +150,10 @@ class CopyTradeBot:
             f"ROI≥{c.filters.min_roi}, ret≥{c.filters.min_expected_return}\n"
             f"Entry [{c.filters.min_entry_price}, {c.filters.max_entry_price}], "
             f"Size [{c.filters.min_size}, {c.filters.max_size}]\n"
+            f"Exposure: {self.storage.open_exposure():g} open"
+            + (f" / cap {c.sizing.bankroll * c.risk.max_exposure_fraction:g}"
+               if c.risk.max_exposure_fraction is not None else " (no cap)")
+            + f", max open {c.risk.max_open_positions}\n"
             f"Fills: model={c.execution.fill_model} data={c.execution.data_source} "
             f"slippage={c.execution.slippage_bps}bps fee={c.execution.fee_bps}bps\n"
             f"Required fields: {c.filters.require_fields}"

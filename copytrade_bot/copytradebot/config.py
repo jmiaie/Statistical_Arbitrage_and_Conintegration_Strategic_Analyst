@@ -55,6 +55,10 @@ class SizingConfig:
 class RiskConfig:
     max_open_positions: int = 25
     max_daily_loss: float = 250.0
+    # Cap on total cash deployed across all open positions, as a fraction of
+    # the sizing bankroll. Prevents many small trades from compounding into
+    # bankroll-sized exposure (None disables the bound).
+    max_exposure_fraction: Optional[float] = 0.5
 
 
 @dataclass
@@ -145,6 +149,7 @@ SETTABLE_FIELDS: dict[str, tuple[str, type]] = {
     # risk
     "max_open_positions": ("risk", int),
     "max_daily_loss": ("risk", float),
+    "max_exposure_fraction": ("risk", float),
     # execution / fill realism
     "data_source": ("execution", str),    # none | polymarket
     "fill_model": ("execution", str),     # alert | mid | book

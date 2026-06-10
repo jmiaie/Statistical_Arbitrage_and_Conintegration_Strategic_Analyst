@@ -137,6 +137,14 @@ class Storage:
             "SELECT * FROM positions WHERE status='open' ORDER BY id DESC"
         ))
 
+    def open_exposure(self) -> float:
+        """Total cash currently deployed across open positions."""
+        row = self.conn.execute(
+            "SELECT COALESCE(SUM(stake),0) AS s FROM positions "
+            "WHERE status='open'"
+        ).fetchone()
+        return float(row["s"])
+
     def count_open_positions(self) -> int:
         row = self.conn.execute(
             "SELECT COUNT(*) AS n FROM positions WHERE status='open'"

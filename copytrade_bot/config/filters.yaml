@@ -29,6 +29,7 @@ sizing:
 risk:
   max_open_positions: 25
   max_daily_loss: 250.0
+  max_exposure_fraction: 0.5   # cap total open stake at 50% of bankroll (null disables)
 
 execution:                    # how paper fills are simulated
   data_source: none           # none | polymarket  (live market data)

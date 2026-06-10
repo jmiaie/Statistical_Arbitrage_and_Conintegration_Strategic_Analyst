@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from copytradebot.executors.base import ExecutionError
 from copytradebot.executors.polymarket import select_market
 from copytradebot.storage import Storage
+from copytradebot.config import (StrategyConfig, Settings, FilterConfig,
+                                 SizingConfig, RiskConfig)
+from copytradebot.pipeline import Pipeline
 
 
 # ---- market selection: refuse rather than guess --------------------------- #
@@ -76,3 +79,39 @@ def test_mark_seen_persists_across_reopen():
         Storage(path).mark_seen("123:7")
         # A restart must still treat the update as already processed.
         assert Storage(path).mark_seen("123:7") is False
+
+
+# ---- total-exposure cap --------------------------------------------------- #
+def _exposure_pipeline(tmp, fraction):
+    cfg = StrategyConfig(
+        mode="paper",
+        filters=FilterConfig(min_win_rate=0.6, min_ev=0.0),
+        sizing=SizingConfig(mode="fraction", bankroll=1000, fraction=0.05,
+                            max_position=200, min_position=1),
+        risk=RiskConfig(max_exposure_fraction=fraction),
+    )
+    storage = Storage(os.path.join(tmp, "t.db"))
+    settings = Settings(db_path=os.path.join(tmp, "t.db"))
+    return Pipeline(cfg, settings, storage), storage
+
+
+_ALERT = "Market: BTC up?\nYES win rate 70% EV +12% entry 0.5"
+
+
+def test_exposure_cap_blocks_when_breached():
+    # cap = 0.5 x 1000 = 500; each stake is 5% of 1000 = 50 -> 10 fit, 11th blocked.
+    with tempfile.TemporaryDirectory() as tmp:
+        pipe, storage = _exposure_pipeline(tmp, fraction=0.5)
+        placed = sum(1 for _ in range(15) if pipe.process(_ALERT).placed)
+        assert placed == 10
+        assert storage.open_exposure() == 500.0
+        last = pipe.process(_ALERT)
+        assert not last.placed
+        assert "exposure cap" in last.note
+
+
+def test_exposure_cap_disabled_allows_all():
+    with tempfile.TemporaryDirectory() as tmp:
+        pipe, _ = _exposure_pipeline(tmp, fraction=None)
+        placed = sum(1 for _ in range(15) if pipe.process(_ALERT).placed)
+        assert placed == 15
