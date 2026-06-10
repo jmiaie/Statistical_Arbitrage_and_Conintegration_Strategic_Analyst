@@ -58,6 +58,24 @@ class Decision:
         return f"{head}\n{line2}\n{tail}"
 
 
+@dataclass
+class BasketDecision:
+    """Outcome of routing a (possibly multi-leg) scanner Opportunity."""
+    kind: str
+    signal_id: Optional[int] = None
+    legs: list = field(default_factory=list)   # placed Position objects
+    total_stake: float = 0.0
+    placed: bool = False
+    note: str = ""
+
+    def summary(self) -> str:
+        if self.placed:
+            legs = ", ".join(f"{p.side}@{p.entry_price:g}×{p.stake:g}"
+                             for p in self.legs)
+            return f"✅ {self.kind.upper()} basket · {legs}"
+        return f"🚫 {self.kind.upper()} basket · {self.note}"
+
+
 class Pipeline:
     """Owns config + storage + executor and processes incoming alerts."""
 
@@ -97,6 +115,73 @@ class Pipeline:
             return (False, f"exposure cap hit (open+new {projected:.2f} > "
                            f"{cap:.2f} = {frac:g}x bankroll)")
         return True, ""
+
+    def _basket_total(self) -> float:
+        """Total cash to deploy across a basket's legs (non-Kelly: a basket's
+        edge isn't a single binary bet). Clamped to the per-trade cap."""
+        sz = self.config.sizing
+        total = sz.fixed_amount if sz.mode == "fixed" else sz.bankroll * sz.fraction
+        return round(max(sz.min_position, min(total, sz.max_position)), 2)
+
+    def place_opportunity(self, opp, source: str | None = None) -> BasketDecision:
+        """Gate and place a scanner Opportunity, single- or multi-leg.
+
+        Gates on the *basket-level* edge/confidence (per-leg EV is meaningless
+        for a hedged basket), sizes the basket once and splits it across legs by
+        ``Leg.weight``, then opens every leg through the active executor. All
+        legs share one ``signal_id`` so they're linked as a group. Honours the
+        enabled flag, dry-run, open-count and exposure caps.
+        """
+        d = BasketDecision(kind=opp.kind)
+        if not self.config.enabled:
+            d.note = "bot disabled"
+            return d
+
+        f = self.config.filters
+        ev_pct = round(opp.edge * 100, 2)
+        if f.min_ev is not None and ev_pct < f.min_ev:
+            d.note = f"edge {ev_pct:g}% < min_ev {f.min_ev:g}"
+            return d
+        if f.min_win_rate is not None and opp.confidence < f.min_win_rate:
+            d.note = f"confidence {opp.confidence:g} < min_win_rate {f.min_win_rate:g}"
+            return d
+
+        ok, why = self._risk_ok()
+        if not ok:
+            d.note = f"blocked by risk: {why}"
+            return d
+
+        total = self._basket_total()
+        ok, why = self._exposure_ok(total)
+        if not ok:
+            d.note = f"blocked by risk: {why}"
+            return d
+        d.total_stake = total
+
+        # Log one representative signal for the whole basket; its id links legs.
+        signals = opp.to_signals(source)
+        rep = signals[0]
+        from .models import FilterResult
+        d.signal_id = self.storage.record_signal(
+            rep, FilterResult(passed=True, reasons=[f"scanner:{opp.kind}"]))
+
+        if self.config.dry_run:
+            d.note = f"dry-run: would deploy {total:g} across {len(signals)} leg(s)"
+            return d
+
+        weight_sum = sum(max(0.0, leg.weight) for leg in opp.legs) or 1.0
+        executor = self._executor()
+        for leg, sig in zip(opp.legs, signals):
+            leg_stake = round(total * max(0.0, leg.weight) / weight_sum, 2)
+            if leg_stake <= 0:
+                continue
+            try:
+                pos = executor.place(sig, leg_stake, d.signal_id)
+                d.legs.append(pos)
+            except Exception as exc:  # one bad leg shouldn't abort the rest
+                d.note = f"leg execution error: {exc}"
+        d.placed = bool(d.legs)
+        return d
 
     def _process_exit(self, signal: Signal, decision: Decision) -> Decision:
         """Settle the open position(s) an exit/close alert refers to.

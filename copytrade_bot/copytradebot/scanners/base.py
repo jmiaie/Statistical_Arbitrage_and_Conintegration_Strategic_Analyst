@@ -33,15 +33,9 @@ class Opportunity:
     def is_single_leg(self) -> bool:
         return len(self.legs) == 1
 
-    def to_signal(self, source: str | None = None) -> Signal:
-        """Convert a single-leg opportunity into a pipeline Signal.
-
-        ``edge`` (fraction) maps to EV/ROI percent so the existing FilterEngine
-        thresholds apply uniformly to alerts and scanner output.
-        """
-        if not self.is_single_leg():
-            raise ValueError("Only single-leg opportunities convert to a Signal.")
-        leg = self.legs[0]
+    def _leg_signal(self, leg: "Leg", source: str | None) -> Signal:
+        # The basket-level edge maps to EV/ROI percent so the existing
+        # FilterEngine thresholds apply uniformly to alerts and scanner output.
         ev_pct = round(self.edge * 100, 2)
         return Signal(
             raw_text=self.rationale,
@@ -52,7 +46,23 @@ class Opportunity:
             ev=ev_pct,
             roi=ev_pct,
             entry_price=leg.price,
+            size=None,
         )
+
+    def to_signal(self, source: str | None = None) -> Signal:
+        """Convert a single-leg opportunity into a pipeline Signal."""
+        if not self.is_single_leg():
+            raise ValueError(
+                "Multi-leg opportunity: use to_signals() (plural).")
+        return self._leg_signal(self.legs[0], source)
+
+    def to_signals(self, source: str | None = None) -> list[Signal]:
+        """Convert every leg into a Signal (works for single- or multi-leg).
+
+        Each leg becomes its own Signal carrying the basket-level edge; the
+        relative ``Leg.weight`` is preserved separately for sizing by the
+        caller (see ``Pipeline.place_opportunity``)."""
+        return [self._leg_signal(leg, source) for leg in self.legs]
 
 
 class Scanner(ABC):

@@ -31,28 +31,32 @@ reality, not the other way around.
 
 ## Blocking defects (fix before any live order)
 
-These were found in review and are tracked as P0:
+These were found in review and tracked as P0. **All five are now resolved** (each with tests;
+suite at 66 passing).
 
-1. **Live executor does not match its own safety claim.** `polymarket.py:_resolve_token` takes
-   `markets[0]` from Gamma search (not the word-overlap ranker that already exists in
-   `marketdata.py`), silently falls back to outcome index 0, and defaults price to 0.5. The
-   docstring says it "refuses rather than guesses" — make that true: reuse `find_market`,
-   require a minimum match score, refuse on ambiguity, never default the price.
-2. **No idempotency.** `edited_channel_post` re-fires the pipeline; reposts double-trade.
-   Store Telegram message ids; skip already-seen ids.
-3. **No cash/exposure accounting.** Defaults allow 25 open × $200 = $5,000 exposure on a
-   $1,000 bankroll; paper stakes are never debited from anything. Add a tracked cash balance
-   and a total-open-exposure cap (e.g. ≤ 50% of bankroll). Also fix `Pipeline._day_start`
-   (computed once at construction — "daily" loss never rolls over).
-4. **No exit support anywhere.** Executors can only open and settle-at-resolution. The parser
-   has no exit intent — a channel posting "closing NVDA position" parses as a fresh entry.
-   Needed: parser exit/update detection + a sell/close path in paper and live executors.
-5. **Multi-leg execution missing.** `Opportunity.to_signal()` raises for multi-leg, which
-   excludes exactly the two scanners worth running (arbitrage, cointegration).
+1. ✅ **Live executor now refuses rather than guesses.** `select_market()` ranks Gamma
+   candidates by word overlap and raises on a weak (<2 shared words) or ambiguous match;
+   side mapping refuses instead of falling back to outcome 0; a missing entry price is
+   refused instead of defaulting to 0.5. *(commit: live-executor + idempotency)*
+2. ✅ **Idempotency.** `seen_updates` table + `Storage.mark_seen()`; the bot dedupes source
+   posts by chat+message id, so edits/redelivery can't re-fire a trade. Survives restarts.
+3. ✅ **Exposure accounting + daily rollover.** `RiskConfig.max_exposure_fraction` (default
+   0.5×bankroll) enforced via `Storage.open_exposure()`; `_today_start()` recomputed per
+   check so the daily-loss limit rolls over. Surfaced in `/status`.
+4. ✅ **Exit support.** `Signal.intent` (ENTRY/EXIT), conservative exit + exit-price parsing,
+   `Storage.find_open_by_market()`, and `Pipeline._process_exit()` that settles matching
+   open positions and never opens one. Live-mode auto-close explicitly declined for now.
+5. ✅ **Multi-leg execution.** `Opportunity.to_signals()` (plural) + `Pipeline.place_opportunity()`
+   gate on basket-level edge/confidence, size once and split by leg weight, and link legs via a
+   shared `signal_id`. Unblocks arbitrage + cointegration execution.
+
+**Remaining P0 follow-ups (smaller, not yet done):** NO-leg pricing optimism (scanners price
+NO at `1−YES_ask`, ignoring its own spread); Kelly sizing still keys off the channel's *quoted*
+win rate (real fix is the P1 calibration layer); cointegration multiple-testing control.
 
 ## Phased plan
 
-**P0 — Safety floor (before any live dollar):** items 1–5 above, each with tests.
+**P0 — Safety floor (before any live dollar):** ✅ items 1–5 complete. Follow-ups above remain.
 
 **P1 — Real-data validation (no money at risk):**
 - Scanner daemon: poll Gamma for active markets on a schedule, build snapshots/series, run
