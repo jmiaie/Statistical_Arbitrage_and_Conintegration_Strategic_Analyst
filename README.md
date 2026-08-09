@@ -4,7 +4,25 @@ PUBLIC: Statistical Arbitrage and Conintegration Strategic Analyst (Python)
 
 ## 👤 Author: Jeff Milam, MBA | jmilam.emba@gmail.com | https://www.github.com/jmiaie
 
+---
 
+### 📦 What's in this repository today
+
+The **implemented, tested system** lives in [`copytrade_bot/`](copytrade_bot/) — a
+prediction-market (Polymarket) **copy-trading and statistical-arbitrage engine**:
+a Telegram alert pipeline (parse → per-source win-rate **calibration** → filter →
+size → risk gate → execute), a realistic paper-trading engine (live order-book
+fills, slippage, fees, real on-chain settlement), four alert-free scanners
+(arbitrage, longshot-bias, mean-reversion, **cointegration**), and a Monte Carlo
+strategy optimizer. Start at [`copytrade_bot/README.md`](copytrade_bot/README.md)
+and [`copytrade_bot/ROADMAP.md`](copytrade_bot/ROADMAP.md).
+
+The equities Kalman-filter / Fama-French methodology described below is the
+**aspirational research design** that motivated the project; the cointegration
+and statistical-arbitrage machinery is currently realized on prediction markets
+in `copytrade_bot/`.
+
+---
 
 ### 1. Executive Summary
 

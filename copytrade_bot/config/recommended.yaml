@@ -1,0 +1,35 @@
+enabled: true
+mode: paper
+dry_run: false
+filters:
+  min_win_rate: 0.7
+  min_ev: 5.0
+  min_roi: null
+  min_expected_return: null
+  min_entry_price: null
+  max_entry_price: null
+  min_size: null
+  max_size: null
+  require_fields:
+  - win_rate
+  blocked_keywords: []
+  allowed_sources: []
+  blocked_sources: []
+sizing:
+  mode: fixed
+  fixed_amount: 20.0
+  bankroll: 1000.0
+  fraction: 0.02
+  kelly_fraction: 0.5
+  max_position: 1000.0
+  min_position: 1.0
+risk:
+  max_open_positions: 25
+  max_daily_loss: 250.0
+execution:
+  data_source: none
+  fill_model: alert
+  slippage_bps: 50.0
+  fee_bps: 0.0
+  user_agent: copytrade-bot/0.1
+  require_live_market: false
