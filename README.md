@@ -1,91 +1,43 @@
 # Statistical_Arbitrage_and_Conintegration_Strategic_Analyst
-PUBLIC: Statistical Arbitrage and Conintegration Strategic Analyst (Python)
-## Project Title: Dynamic Statistical Arbitrage & Risk-Aware Backtesting
 
-## 👤 Author: Jeff Milam, MBA | jmilam.emba@gmail.com | https://www.github.com/jmiaie
+> **Status (2026-09-30):** **Stalled / WIP name-hold** — not an institutional product and **not** a complete statistical-arbitrage codebase. See [`STATUS.md`](STATUS.md).
 
+**Public** Python remote historically pitched as “Dynamic Statistical Arbitrage & Risk-Aware Backtesting.”  
+**Author context:** Jeff Milam ([`jmiaie`](https://github.com/jmiaie)).
 
+## What you will find here
 
-### 1. Executive Summary
+- A **Kalshi market-data helper** under `copytrade_bot/copytradebot/kalshi.py` (exploratory venue adapter).
+- A leftover `generate_pdf.py` aimed at a **different** project title (sentiment PDF).
+- **No** cointegration screen, Kalman hedge-ratio engine, Fama–French attribution, TCA stack, or verified backtest results in-tree.
 
-This repository implements an institutional-grade statistical arbitrage strategy. Unlike traditional static pairs trading, this project utilizes a Kalman Filter for dynamic state estimation of hedge ratios and a Fama-French Factor Model to isolate idiosyncratic alpha. The strategy is rigorously tested against a non-linear Transaction Cost Model to determine capacity and execution sensitivity.
+Older README language that described Sharpe / IC / capacity KPIs and “institutional-grade” delivery described **intent**, not measured outcomes in this repository. **No performance figures are claimed here.**
 
-### 2. Quantitative Methodology
+## Canonical / related homes
 
-A. Pair Selection & Cointegration
+| Concern | Prefer |
+|---------|--------|
+| Quant portfolio narrative | [`quant-research-portfolio`](https://github.com/jmiaie/quant-research-portfolio) |
+| Sentiment methodology chapter | [`ML_Sentiment_Augmented_Price_Predictor`](https://github.com/jmiaie/ML_Sentiment_Augmented_Price_Predictor) |
+| Private twin of this name | [`…_priv`](https://github.com/jmiaie/Statistical_Arbitrage_and_Conintegration_Strategic_Analyst_priv) |
 
-    Screening: Universe selection based on sector-neutrality and high correlation.
+## Historical methodology outline (aspirational — not implemented here)
 
-    Statistical Validation: Implementation of the Engle-Granger two-step method and Johansen Test for multivariate cointegration (baskets).
+The following bullets are retained only as a **research wishlist**, not as a claim that this repo executes them:
 
-    Stationarity: Checking for I(0) residuals in the spread to ensure mean-reversion.
+- Pair / basket cointegration checks (Engle–Granger / Johansen-style)
+- Dynamic hedge ratios (state-space / Kalman-style)
+- Factor-neutrality checks (e.g. Fama–French-style regressions)
+- Transaction-cost and capacity sensitivity
 
-B. Signal Processing (Kalman Filter)
+If those land, they should ship with reproducible code, offline fixtures, and honest null/failure reporting — not KPI theater.
 
-The strategy moves beyond static OLS by using a state-space representation to model the relationship between assets:
+## How to inspect (offline)
 
-    Observation: Yt​=βt​Xt​+αt​+ϵt​
+```bash
+git clone https://github.com/jmiaie/Statistical_Arbitrage_and_Conintegration_Strategic_Analyst.git
+cd Statistical_Arbitrage_and_Conintegration_Strategic_Analyst
+# Read STATUS.md first. There is no requirements.txt or strategy CLI on main today.
+```
 
-    Transition: βt​=βt−1​+ηt​ This allows the algorithm to adapt to "Regime Shifts" and structural breaks in the market without look-ahead bias.
-
-C. Risk & Factor Attribution
-
-To ensure the strategy isn't just a proxy for a known risk factor, we regress strategy returns against the Fama-French 3-Factor Model:
-
-    Market (Mkt-RF): Proving market-neutrality (Beta ≈ 0).
-
-    Size (SMB) & Value (HML): Ensuring returns are not driven by simple style tilts.
-
-    Alpha Tracking: Measuring the intercept to confirm statistically significant skill.
-
-### 3. Execution & TCA (Transaction Cost Analysis)
-
-Recognizing that "paper trades" are deceptive, this project incorporates:
-
-    Slippage Model: A Square-Root Law impact function based on daily volatility and % of ADV.
-
-    Alpha Decay: Analysis of P&L sensitivity to execution delay (latency).
-
-    Capacity Estimation: Determining the maximum trade size before market impact erodes the Sharpe ratio.
-
-### 4. Key Performance Indicators (KPIs)
-
-    Annualized Sharpe Ratio: (Net of costs).
-
-    Maximum Drawdown: Recovery time analysis.
-
-    Information Coefficient (IC): Measuring signal predictive power.
-
-    Factor Exposures: Heatmap of rolling betas to major indices.
-
-### 5. Tech Stack
-
-    Languages: Python 3.x
-
-    Quantitative Libraries: NumPy, Pandas, Statsmodels, SciPy
-
-    Signal Processing: PyKalman (or custom implementation)
-
-    Data/Backtesting: yfinance, Pandas-Datareader, Matplotlib
-
-### 6. How to Run
-
-    Bash
-
-    **Clone the repository**
-    git clone https://github.com/jmiaie/stat-arb-kalman.git
-
-    **Install dependencies**
-    pip install -r requirements.txt
-
-    **Run the research notebook**
-    jupyter notebook research/main_backtest.ipynb
-
-
-__________________________________________________________________________________________________________
-
-## Copyright (c) 2026 Jeff Milam, MBA. All Rights Reserved.
-## GitHub: https://github.com/jmiaie
-##
-## This code is proprietary and private. Unauthorized copying of this file,
-## via any medium, is strictly prohibited.
+Private twin clone URL (if needed): `https://github.com/jmiaie/Statistical_Arbitrage_and_Conintegration_Strategic_Analyst_priv.git`
